@@ -20,6 +20,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <arpa/inet.h>
 #include "ieee1905_network.h"
 
 

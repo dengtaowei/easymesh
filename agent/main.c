@@ -111,7 +111,7 @@ void client_read_cb(struct bufferevent *bev, void *arg)
     struct evbuffer *output = bufferevent_get_output(bev);
     size_t len = evbuffer_get_length(input);
     char *data;
-    data = malloc(len);
+    data = (char *)malloc(len);
     evbuffer_remove(input, data, len);
     cmdu_raw_msg *msg = (cmdu_raw_msg *)data;
     unsigned short type = ntohs(msg->msg_1905.hdr.msg_type);
@@ -120,21 +120,21 @@ void client_read_cb(struct bufferevent *bev, void *arg)
         printf("topo discovery received from %02x:%02x:%02x:%02x:%02x:%02x\n",
             msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3], 
             msg->src_addr[4], msg->src_addr[5]);
-            send_topology_query(arg, msg->src_addr, msg->msg_1905.hdr.msg_id);
+            send_topology_query((NetworkInterface *)arg, msg->src_addr, msg->msg_1905.hdr.msg_id);
     }
     else if (type == MSG_TOPOLOGY_QUERY)
     {
         printf("topo query received from %02x:%02x:%02x:%02x:%02x:%02x\n",
             msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3], 
             msg->src_addr[4], msg->src_addr[5]);
-        send_topology_response(arg, msg->src_addr, msg->msg_1905.hdr.msg_id);
+        send_topology_response((NetworkInterface *)arg, msg->src_addr, msg->msg_1905.hdr.msg_id);
     }
     free(data);
 }
 struct event* timer_ev = NULL;
 void send_discovery_perodic(int sockfd, short what, void* arg) {
 
-    int ret = send_topology_discovery(arg);
+    int ret = send_topology_discovery((NetworkInterface *)arg);
     if (ret < 0)
     {
         printf("sk send error\n");

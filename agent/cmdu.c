@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 #include "msg.h"
 #include "cmdu.h"
@@ -63,7 +64,7 @@ int send_topology_discovery(NetworkInterface *interface)
 {
     unsigned char dest_addr[ETH_ALEN] = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x13};
     char buffer[512] = { 0 };
-    cmdu_raw_msg *raw_msg = buffer;
+    cmdu_raw_msg *raw_msg = (cmdu_raw_msg *)buffer;
     int offset = 0;
 
     memcpy(raw_msg->dest_addr, dest_addr, ETH_ALEN);
@@ -112,7 +113,7 @@ int send_topology_discovery(NetworkInterface *interface)
 int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id)
 {
     char buffer[512] = { 0 };
-    cmdu_raw_msg *raw_msg = buffer;
+    cmdu_raw_msg *raw_msg = (cmdu_raw_msg *)buffer;
     int offset = 0;
 
     memcpy(raw_msg->dest_addr, dest, ETH_ALEN);
@@ -124,7 +125,7 @@ int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsign
 
     offset += sizeof(cmdu_raw_msg);
 
-    tlv_type_end *end = raw_msg->tlvs;
+    tlv_type_end *end = (tlv_type_end *)raw_msg->tlvs;
 
     end->type = 0;
     end->len = 0;
@@ -135,7 +136,7 @@ int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsign
 int send_topology_response(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id)
 {
     char buffer[512] = { 0 };
-    cmdu_raw_msg *raw_msg = buffer;
+    cmdu_raw_msg *raw_msg = (cmdu_raw_msg *)buffer;
     int offset = 0;
 
     memcpy(raw_msg->dest_addr, dest, ETH_ALEN);
@@ -147,7 +148,7 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
 
     offset += sizeof(cmdu_raw_msg);
 
-    tlv_type_1905_device_info *dev_info = raw_msg->tlvs;
+    tlv_type_1905_device_info *dev_info = (tlv_type_1905_device_info *)raw_msg->tlvs;
     dev_info->type = 0x03;
     dev_info->len = 0;
     memcpy(dev_info->al_mac, interface->addr, ETH_ALEN);
@@ -162,14 +163,14 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
     dev_info->len += sizeof(local_if_dev_info);
     dev_info->len = htons(dev_info->len);
 
-    tlv_type_supported_service_info *sup_service = dev_info->if_devs[0].special_info;
+    tlv_type_supported_service_info *sup_service = (tlv_type_supported_service_info *)dev_info->if_devs[0].special_info;
     sup_service->type = 0x80;
     sup_service->len = htons(2);
     sup_service->sup_service_count = 1;
     sup_service->sup_service = 1; // agent
     offset += sizeof(tlv_type_supported_service_info);
 
-    tlv_type_end *end = buffer + offset;
+    tlv_type_end *end = (tlv_type_end *)(buffer + offset);
     end->type = 0;
     end->len = 0;
     offset += sizeof(tlv_type_end);
