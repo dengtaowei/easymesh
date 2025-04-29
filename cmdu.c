@@ -1,8 +1,11 @@
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "msg.h"
 #include "cmdu.h"
 #include "ieee1905_network.h"
+#include "tlv_parser.h"
 
 #pragma pack(push, 1)
 
@@ -70,23 +73,36 @@ int send_topology_discovery(NetworkInterface *interface)
 
     offset += sizeof(cmdu_raw_msg);
 
-    tlv_type_al_mac *al_mac = raw_msg->tlvs;
-    tlv_type_mac *mac = raw_msg->tlvs + sizeof(tlv_type_al_mac);
-    tlv_type_end *end = (char *)mac + sizeof(tlv_type_mac);
+    // tlv_type_al_mac *al_mac = raw_msg->tlvs;
+    // tlv_type_mac *mac = raw_msg->tlvs + sizeof(tlv_type_al_mac);
+    // tlv_type_end *end = (char *)mac + sizeof(tlv_type_mac);
 
-    al_mac->type = 0x01;
-    al_mac->len = htons(6);
-    memcpy(al_mac->al_mac, interface->addr, ETH_ALEN);
-    offset += sizeof(tlv_type_al_mac);
+    // al_mac->type = 0x01;
+    // al_mac->len = htons(6);
+    // memcpy(al_mac->al_mac, interface->addr, ETH_ALEN);
+    // offset += sizeof(tlv_type_al_mac);
 
-    mac->type = 0x02;
-    mac->len = htons(6);
-    memcpy(mac->mac, interface->addr, ETH_ALEN);
-    offset += sizeof(tlv_type_mac);
+    // mac->type = 0x02;
+    // mac->len = htons(6);
+    // memcpy(mac->mac, interface->addr, ETH_ALEN);
+    // offset += sizeof(tlv_type_mac);
 
-    end->type = 0;
-    end->len = 0;
-    offset += sizeof(tlv_type_end);
+    // end->type = 0;
+    // end->len = 0;
+    // offset += sizeof(tlv_type_end);
+
+    KamiTlv_S *pstRoot = Kami_Tlv_CreateObject();
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x01, ETH_ALEN, interface->addr);
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x02, ETH_ALEN, interface->addr);
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x00, 0, NULL);
+
+    unsigned char *pr = Kami_Tlv_Print(pstRoot);
+    memcpy(buffer + offset, pr, Kami_Tlv_ObjectLength(pstRoot));
+    offset  += Kami_Tlv_ObjectLength(pstRoot);
+
+    free(pr);
+
+    Kami_Tlv_Delete(pstRoot);
 
 
 

@@ -9,6 +9,7 @@
                 "-g",
                 "ieee1905_network.c",
                 "cmdu.c",
+                "tlv_parser.c",
                 "${file}",
                 "-o",
                 "${fileDirname}/${fileBasenameNoExtension}",
