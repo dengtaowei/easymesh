@@ -30,7 +30,6 @@ typedef struct
     unsigned short len;
 } tlv_type_end;
 
-
 typedef struct
 {
     unsigned char mac[ETH_ALEN];
@@ -39,31 +38,39 @@ typedef struct
     unsigned char special_info[0];
 } local_if_dev_info;
 
-
 typedef struct
 {
-    unsigned char type;
-    unsigned short len;
     unsigned char al_mac[ETH_ALEN];
     unsigned char local_if_count;
-    local_if_dev_info if_devs[0];
+    local_if_dev_info if_devs[16];
 } tlv_type_1905_device_info;
 
 typedef struct
 {
-    unsigned char type;
-    unsigned short len;
+    unsigned char tuples_count;
+    unsigned char mac_addr_count;
+    unsigned char mac_addr[ETH_ALEN];
+} tlv_type_dev_bridging_capa;
+
+typedef struct
+{
+    unsigned char if_addr[ETH_ALEN];
+    unsigned char nbr_addr[ETH_ALEN];
+    unsigned char nbr_flags;
+} tlv_type_1905_nbr_dev;
+
+typedef struct
+{
     unsigned char sup_service_count;
     unsigned char sup_service;
 } tlv_type_supported_service_info;
 
 #pragma pack(pop)
 
-
 int send_topology_discovery(NetworkInterface *interface)
 {
     unsigned char dest_addr[ETH_ALEN] = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x13};
-    char buffer[512] = { 0 };
+    char buffer[512] = {0};
     cmdu_raw_msg *raw_msg = (cmdu_raw_msg *)buffer;
     int offset = 0;
 
@@ -74,45 +81,27 @@ int send_topology_discovery(NetworkInterface *interface)
 
     offset += sizeof(cmdu_raw_msg);
 
-    // tlv_type_al_mac *al_mac = raw_msg->tlvs;
-    // tlv_type_mac *mac = raw_msg->tlvs + sizeof(tlv_type_al_mac);
-    // tlv_type_end *end = (char *)mac + sizeof(tlv_type_mac);
-
-    // al_mac->type = 0x01;
-    // al_mac->len = htons(6);
-    // memcpy(al_mac->al_mac, interface->addr, ETH_ALEN);
-    // offset += sizeof(tlv_type_al_mac);
-
-    // mac->type = 0x02;
-    // mac->len = htons(6);
-    // memcpy(mac->mac, interface->addr, ETH_ALEN);
-    // offset += sizeof(tlv_type_mac);
-
-    // end->type = 0;
-    // end->len = 0;
-    // offset += sizeof(tlv_type_end);
-
     KamiTlv_S *pstRoot = Kami_Tlv_CreateObject();
     Kami_Tlv_AddTlvToObject(pstRoot, 0x01, ETH_ALEN, interface->addr);
     Kami_Tlv_AddTlvToObject(pstRoot, 0x02, ETH_ALEN, interface->addr);
+    static unsigned char ie[] = {0x00, 0x0c, 0xe7, 0xff, 0x00, 0x0c, 0xe7, 0x00};
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x0b, 8, ie);
     Kami_Tlv_AddTlvToObject(pstRoot, 0x00, 0, NULL);
 
     unsigned char *pr = Kami_Tlv_Print(pstRoot);
     memcpy(buffer + offset, pr, Kami_Tlv_ObjectLength(pstRoot));
-    offset  += Kami_Tlv_ObjectLength(pstRoot);
+    offset += Kami_Tlv_ObjectLength(pstRoot);
 
     free(pr);
 
     Kami_Tlv_Delete(pstRoot);
-
-
 
     return if_sock_send(interface, raw_msg, offset);
 }
 
 int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id)
 {
-    char buffer[512] = { 0 };
+    char buffer[512] = {0};
     cmdu_raw_msg *raw_msg = (cmdu_raw_msg *)buffer;
     int offset = 0;
 
@@ -135,7 +124,7 @@ int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsign
 
 int send_topology_response(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id)
 {
-    char buffer[512] = { 0 };
+    char buffer[512] = {0};
     cmdu_raw_msg *raw_msg = (cmdu_raw_msg *)buffer;
     int offset = 0;
 
@@ -148,32 +137,46 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
 
     offset += sizeof(cmdu_raw_msg);
 
-    tlv_type_1905_device_info *dev_info = (tlv_type_1905_device_info *)raw_msg->tlvs;
-    dev_info->type = 0x03;
-    dev_info->len = 0;
-    memcpy(dev_info->al_mac, interface->addr, ETH_ALEN);
-    dev_info->len += ETH_ALEN;
-    dev_info->local_if_count = 1;
-    dev_info->len += 1;
-    memcpy(dev_info->if_devs[0].mac, interface->addr, ETH_ALEN);
-    dev_info->if_devs[0].media_type = 0;
-    dev_info->if_devs[0].special_info_len = 0;
-    offset += sizeof(tlv_type_1905_device_info);
-    offset += sizeof(local_if_dev_info);
-    dev_info->len += sizeof(local_if_dev_info);
-    dev_info->len = htons(dev_info->len);
+    KamiTlv_S *pstRoot = Kami_Tlv_CreateObject();
+    tlv_type_1905_device_info dev_info;
+    memset(&dev_info, 0, sizeof(dev_info));
+    memcpy(dev_info.al_mac, interface->addr, ETH_ALEN);
+    dev_info.local_if_count = 1;
+    memcpy(dev_info.if_devs[0].mac, interface->addr, ETH_ALEN);
+    dev_info.if_devs[0].media_type = 0x0000;
+    dev_info.if_devs[0].special_info_len = 0;
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x03,
+                            ETH_ALEN + 1 + sizeof(local_if_dev_info) * dev_info.local_if_count, &dev_info);
 
-    tlv_type_supported_service_info *sup_service = (tlv_type_supported_service_info *)dev_info->if_devs[0].special_info;
-    sup_service->type = 0x80;
-    sup_service->len = htons(2);
-    sup_service->sup_service_count = 1;
-    sup_service->sup_service = 1; // agent
-    offset += sizeof(tlv_type_supported_service_info);
+    tlv_type_dev_bridging_capa brg_capa;
+    memset(&brg_capa, 0, sizeof(brg_capa));
+    brg_capa.tuples_count = 1;
+    brg_capa.mac_addr_count = 1;
+    memcpy(brg_capa.mac_addr, interface->addr, ETH_ALEN);
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x04, sizeof(brg_capa), &brg_capa);
 
-    tlv_type_end *end = (tlv_type_end *)(buffer + offset);
-    end->type = 0;
-    end->len = 0;
-    offset += sizeof(tlv_type_end);
+    tlv_type_1905_nbr_dev ngr_dev;
+    memset(&ngr_dev, 0, sizeof(ngr_dev));
+    memcpy(ngr_dev.if_addr, interface->addr, ETH_ALEN);
+    memcpy(ngr_dev.nbr_addr, interface->nbr_1905dev_mac, ETH_ALEN);
+    ngr_dev.nbr_flags = 0x80;
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x07, sizeof(ngr_dev), &ngr_dev);
+
+    tlv_type_supported_service_info sup_info;
+    memset(&sup_info, 0, sizeof(sup_info));
+    sup_info.sup_service_count = 1;
+    sup_info.sup_service = 1;
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x80, sizeof(sup_info), &sup_info);
+
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x00, 0, NULL);
+
+    unsigned char *pr = Kami_Tlv_Print(pstRoot);
+    memcpy(buffer + offset, pr, Kami_Tlv_ObjectLength(pstRoot));
+    offset += Kami_Tlv_ObjectLength(pstRoot);
+
+    free(pr);
+
+    Kami_Tlv_Delete(pstRoot);
 
     return if_sock_send(interface, raw_msg, offset);
 }

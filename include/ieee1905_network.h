@@ -10,7 +10,7 @@ typedef struct _NetworkInterface
     char ifname[IF_NAMESIZE];
     unsigned char br_addr[ETH_ALEN];
     unsigned char al_addr[ETH_ALEN];
-
+    unsigned char nbr_1905dev_mac[ETH_ALEN];
 } NetworkInterface;
 
 int if_sock_create(NetworkInterface *interface);

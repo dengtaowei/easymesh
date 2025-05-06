@@ -47,8 +47,6 @@
 #include "ieee1905_network.h"
 #include "cmdu.h"
 
-
-
 // 错误，超时 （连接断开会进入）
 void client_event_cb(struct bufferevent *be, short events, void *arg)
 {
@@ -107,6 +105,7 @@ void client_read_cb(struct bufferevent *bev, void *arg)
 {
     // cout << "[client_R]" << flush;
     printf("client_R\n");
+    NetworkInterface *interface = (NetworkInterface *)arg;
     struct evbuffer *input = bufferevent_get_input(bev);
     struct evbuffer *output = bufferevent_get_output(bev);
     size_t len = evbuffer_get_length(input);
@@ -118,21 +117,29 @@ void client_read_cb(struct bufferevent *bev, void *arg)
     if (type == MSG_TOPOLOGY_DISCOBERY)
     {
         printf("topo discovery received from %02x:%02x:%02x:%02x:%02x:%02x\n",
-            msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3], 
-            msg->src_addr[4], msg->src_addr[5]);
-            send_topology_query((NetworkInterface *)arg, msg->src_addr, msg->msg_1905.hdr.msg_id);
+               msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
+               msg->src_addr[4], msg->src_addr[5]);
+        if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
+        {
+            memcpy(interface->nbr_1905dev_mac, msg->src_addr, ETH_ALEN);
+            send_topology_query(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
+        }
     }
     else if (type == MSG_TOPOLOGY_QUERY)
     {
         printf("topo query received from %02x:%02x:%02x:%02x:%02x:%02x\n",
-            msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3], 
-            msg->src_addr[4], msg->src_addr[5]);
-        send_topology_response((NetworkInterface *)arg, msg->src_addr, msg->msg_1905.hdr.msg_id);
+               msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
+               msg->src_addr[4], msg->src_addr[5]);
+        if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
+        {
+            send_topology_response(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
+        }
     }
     free(data);
 }
-struct event* timer_ev = NULL;
-void send_discovery_perodic(int sockfd, short what, void* arg) {
+struct event *timer_ev = NULL;
+void send_discovery_perodic(int sockfd, short what, void *arg)
+{
 
     int ret = send_topology_discovery((NetworkInterface *)arg);
     if (ret < 0)
@@ -140,11 +147,12 @@ void send_discovery_perodic(int sockfd, short what, void* arg) {
         printf("sk send error\n");
         return;
     }
-    struct timeval t1 = { 45, 0 };	// 1秒0毫秒
-    if (!evtimer_pending(timer_ev, &t1)) {
-		evtimer_del(timer_ev);
-		evtimer_add(timer_ev, &t1);
-	}
+    struct timeval t1 = {45, 0}; // 1秒0毫秒
+    if (!evtimer_pending(timer_ev, &t1))
+    {
+        evtimer_del(timer_ev);
+        evtimer_add(timer_ev, &t1);
+    }
     return;
 }
 int main(int argc, char *argv[])
@@ -159,12 +167,12 @@ int main(int argc, char *argv[])
     int ret = 0;
     NetworkInterface interface;
     memset(&interface, 0, sizeof(interface));
-    interface.addr[0] = 0x00;   // 00:0c:29:09:78:b7
-    interface.addr[1] = 0x0c;   // 00:0c:29:09:78:b7
-    interface.addr[2] = 0x29;   // 00:0c:29:09:78:b7
-    interface.addr[3] = 0x09;   // 00:0c:29:09:78:b7
-    interface.addr[4] = 0x78;   // 00:0c:29:09:78:b7
-    interface.addr[5] = 0xb7;   // 00:0c:29:09:78:b7
+    interface.addr[0] = 0x00; // 00:0c:29:09:78:b7
+    interface.addr[1] = 0x0c; // 00:0c:29:09:78:b7
+    interface.addr[2] = 0x29; // 00:0c:29:09:78:b7
+    interface.addr[3] = 0x09; // 00:0c:29:09:78:b7
+    interface.addr[4] = 0x78; // 00:0c:29:09:78:b7
+    interface.addr[5] = 0xb7; // 00:0c:29:09:78:b7
     snprintf(interface.ifname, sizeof(interface.ifname), "%s", "ens32");
     ret = if_sock_create(&interface);
     if (ret)
@@ -173,17 +181,15 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-
-    //定时器，非持久事件
-	timer_ev = evtimer_new(base, send_discovery_perodic, &interface);
-	if (!timer_ev) {
-		printf("timer error\n");
-		return 1;
-	}
-	struct timeval t1 = { 1, 0 };	// 1秒0毫秒
-	evtimer_add(timer_ev, &t1); // 插入性能 O(logn)
-
-    
+    // 定时器，非持久事件
+    timer_ev = evtimer_new(base, send_discovery_perodic, &interface);
+    if (!timer_ev)
+    {
+        printf("timer error\n");
+        return 1;
+    }
+    struct timeval t1 = {1, 0}; // 1秒0毫秒
+    evtimer_add(timer_ev, &t1); // 插入性能 O(logn)
 
     struct bufferevent *bev = bufferevent_socket_new(base, interface.fd, 0);
     if (!bev)
@@ -199,7 +205,6 @@ int main(int argc, char *argv[])
     event_base_dispatch(base);
     event_base_free(base);
     if_sock_destroy(&interface);
-
 
     return 0;
 }
