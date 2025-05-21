@@ -4,30 +4,6 @@
 
 #include "list.h"
 
-typedef struct _KamiListNode
-{
-    struct _KamiListNode *next;
-    struct _KamiListNode *prev;
-    struct _KamiList *list;
-    void *data;
-} KamiListNode;
-
-typedef struct _KamiList
-{
-    KamiListNode *head;
-    KamiListNode *tail;
-    int size;
-} KamiList;
-
-#define Iter_From_Head 1
-#define Iter_From_Tail -1;
-
-typedef struct KamiListIterrator
-{
-    KamiListNode *next;
-    int direction;
-}KamiListIterrator;
-
 KamiListIterrator *KamiListGetIter(KamiList *list, int direction)
 {
     KamiListIterrator *iter = (KamiListIterrator *)malloc(sizeof(KamiListIterrator));
