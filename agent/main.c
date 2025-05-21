@@ -145,24 +145,7 @@ void client_read_cb(struct bufferevent *bev, void *arg)
     }
     free(data);
 }
-struct event *timer_ev = NULL;
-void send_discovery_perodic(int sockfd, short what, void *arg)
-{
 
-    int ret = send_topology_discovery((NetworkInterface *)arg);
-    if (ret < 0)
-    {
-        printf("sk send error\n");
-        return;
-    }
-    struct timeval t1 = {45, 0}; // 1秒0毫秒
-    if (!evtimer_pending(timer_ev, &t1))
-    {
-        evtimer_del(timer_ev);
-        evtimer_add(timer_ev, &t1);
-    }
-    return;
-}
 int main(int argc, char *argv[])
 {
     // 忽略管道信号，发送数据给已关闭的socket
@@ -175,6 +158,7 @@ int main(int argc, char *argv[])
     int ret = 0;
     NetworkInterface interface;
     memset(&interface, 0, sizeof(interface));
+    interface.base = base;
     interface.addr[0] = 0x00; // 00:0c:29:09:78:b7
     interface.addr[1] = 0x0c; // 00:0c:29:09:78:b7
     interface.addr[2] = 0x29; // 00:0c:29:09:78:b7
@@ -189,15 +173,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // 定时器，非持久事件
-    timer_ev = evtimer_new(base, send_discovery_perodic, &interface);
-    if (!timer_ev)
-    {
-        printf("timer error\n");
-        return 1;
-    }
-    struct timeval t1 = {1, 0}; // 1秒0毫秒
-    evtimer_add(timer_ev, &t1); // 插入性能 O(logn)
+    register_interface(&interface);
 
     struct bufferevent *bev = bufferevent_socket_new(base, interface.fd, 0);
     if (!bev)

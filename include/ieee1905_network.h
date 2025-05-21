@@ -1,6 +1,7 @@
 #ifndef __IEEEE1905_NETWORK_H__
 #define __IEEEE1905_NETWORK_H__
 #include <linux/if_ether.h>
+#include <event2/buffer.h>
 #include <net/if.h>
 #include "list.h"
 
@@ -13,6 +14,8 @@ typedef struct _NetworkInterface
     unsigned char al_addr[ETH_ALEN];
     KamiListNode ifnode;
     KamiList nbr_1905;
+    struct event_base *base;
+    struct event *topo_timer;
 } NetworkInterface;
 
 int if_sock_create(NetworkInterface *interface);
