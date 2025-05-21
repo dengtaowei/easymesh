@@ -46,6 +46,7 @@
 
 #include "ieee1905_network.h"
 #include "cmdu.h"
+#include "core.h"
 
 // 错误，超时 （连接断开会进入）
 void client_event_cb(struct bufferevent *be, short events, void *arg)
@@ -121,8 +122,15 @@ void client_read_cb(struct bufferevent *bev, void *arg)
                msg->src_addr[4], msg->src_addr[5]);
         if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
         {
-            memcpy(interface->nbr_1905dev_mac, msg->src_addr, ETH_ALEN);
-            send_topology_query(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
+            nbr_1905dev *nbr = (nbr_1905dev *)malloc(sizeof(nbr_1905dev));
+            if (nbr)
+            {
+                memset(nbr, 0, sizeof(nbr_1905dev));
+                memcpy(nbr->al_addr, msg->src_addr, ETH_ALEN);
+                add_1905_nbr(interface, nbr);
+                send_topology_query(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
+            }
+            
         }
     }
     else if (type == MSG_TOPOLOGY_QUERY)

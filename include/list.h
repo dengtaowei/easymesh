@@ -4,6 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stddef.h>
+
+#ifndef container_of
+#define container_of(ptr, type, member)					\
+	({								\
+		const __typeof__(((type *) NULL)->member) *__mptr = (ptr);	\
+		(type *) ((char *) __mptr - offsetof(type, member));	\
+	})
+#endif
+
 typedef struct _KamiListNode
 {
     struct _KamiListNode *next;

@@ -2,6 +2,7 @@
 #define __IEEEE1905_NETWORK_H__
 #include <linux/if_ether.h>
 #include <net/if.h>
+#include "list.h"
 
 typedef struct _NetworkInterface
 {
@@ -10,7 +11,8 @@ typedef struct _NetworkInterface
     char ifname[IF_NAMESIZE];
     unsigned char br_addr[ETH_ALEN];
     unsigned char al_addr[ETH_ALEN];
-    unsigned char nbr_1905dev_mac[ETH_ALEN];
+    KamiListNode ifnode;
+    KamiList nbr_1905;
 } NetworkInterface;
 
 int if_sock_create(NetworkInterface *interface);

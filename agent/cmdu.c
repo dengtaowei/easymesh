@@ -7,6 +7,8 @@
 #include "cmdu.h"
 #include "ieee1905_network.h"
 #include "tlv_parser.h"
+#include "list.h"
+#include "core.h"
 
 #pragma pack(push, 1)
 
@@ -158,7 +160,13 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
     tlv_type_1905_nbr_dev ngr_dev;
     memset(&ngr_dev, 0, sizeof(ngr_dev));
     memcpy(ngr_dev.if_addr, interface->addr, ETH_ALEN);
-    memcpy(ngr_dev.nbr_addr, interface->nbr_1905dev_mac, ETH_ALEN);
+    KamiListIterrator *iter = KamiListGetIter(&interface->nbr_1905, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while((tmp = KamiListNext(iter)) != NULL)
+    {
+        nbr_1905dev *dev = container_of(tmp, nbr_1905dev, node);
+        memcpy(ngr_dev.nbr_addr, dev->al_addr, ETH_ALEN);
+    }
     ngr_dev.nbr_flags = 0x80;
     Kami_Tlv_AddTlvToObject(pstRoot, 0x07, sizeof(ngr_dev), &ngr_dev);
 
