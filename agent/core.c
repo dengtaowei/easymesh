@@ -28,3 +28,20 @@ void add_1905_nbr(NetworkInterface *interface, nbr_1905dev *nbr)
     KamiListAddTail(&interface->nbr_1905, &nbr->node);
     return;
 }
+
+void del_1905_nbr(NetworkInterface *interface, unsigned char *almac)
+{
+    KamiListIterrator *iter = KamiListGetIter(&interface->nbr_1905, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while((tmp = KamiListNext(iter)) != NULL)
+    {
+        nbr_1905dev *dev = container_of(tmp, nbr_1905dev, node);
+        if (0 == memcmp(almac, dev->al_addr, ETH_ALEN))
+        {
+            KamiListDel(&interface->nbr_1905, &dev->node);
+            free(dev);
+        }
+    }
+    KamiListDelIterator(iter);
+    return;
+}

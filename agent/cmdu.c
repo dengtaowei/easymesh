@@ -167,6 +167,7 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
         nbr_1905dev *dev = container_of(tmp, nbr_1905dev, node);
         memcpy(ngr_dev.nbr_addr, dev->al_addr, ETH_ALEN);
     }
+    KamiListDelIterator(iter);
     ngr_dev.nbr_flags = 0x80;
     Kami_Tlv_AddTlvToObject(pstRoot, 0x07, sizeof(ngr_dev), &ngr_dev);
 
