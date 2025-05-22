@@ -98,7 +98,7 @@ int send_topology_discovery(NetworkInterface *interface)
 
     Kami_Tlv_Delete(pstRoot);
 
-    return if_sock_send(interface, raw_msg, offset);
+    return if_send(interface, raw_msg, offset);
 }
 
 int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id)
@@ -121,7 +121,7 @@ int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsign
     end->type = 0;
     end->len = 0;
     offset += sizeof(tlv_type_end);
-    return if_sock_send(interface, raw_msg, offset);
+    return if_send(interface, raw_msg, offset);
 }
 
 int send_topology_response(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id)
@@ -187,5 +187,5 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
 
     Kami_Tlv_Delete(pstRoot);
 
-    return if_sock_send(interface, raw_msg, offset);
+    return if_send(interface, raw_msg, offset);
 }

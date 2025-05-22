@@ -23,13 +23,23 @@
 #include <arpa/inet.h>
 #include "ieee1905_network.h"
 
+static int linux_if_create(NetworkInterface *interface);
+static void linux_if_release(NetworkInterface *interface);
+static int linux_if_send(NetworkInterface *interface, void *buf, int size);
+
+interface_ops if_ops = {
+    .create = linux_if_create,
+    .release = linux_if_release,
+    .send_msg = linux_if_send,
+};
 
 static int attach_bpf_filters(NetworkInterface *interface)
 {
     struct sock_filter zero_bytecode = BPF_STMT(BPF_RET | BPF_K, 0);
-    struct sock_fprog zero           = {1, &zero_bytecode};
-    if (setsockopt(interface->fd, SOL_SOCKET, SO_ATTACH_FILTER, &zero, sizeof(zero)) == -1) {
-        
+    struct sock_fprog zero = {1, &zero_bytecode};
+    if (setsockopt(interface->fd, SOL_SOCKET, SO_ATTACH_FILTER, &zero, sizeof(zero)) == -1)
+    {
+
         return -1;
     }
     char drain[1];
@@ -46,17 +56,26 @@ static int attach_bpf_filters(NetworkInterface *interface)
     //
     // The two dummy addresses in this filter 11:22... and 77:88... will be replaced in runtime with the AL MAC address and the interface's HW address
     struct sock_filter code[17] = {
-        {0x28, 0, 0, 0x0000000c}, {0x15, 0, 8, 0x0000893a}, {0x20, 0, 0, 0x00000002},
-        {0x15, 9, 0, 0xc2000013}, {0x15, 0, 2, 0x33445566}, // 4: replace with AL MAC Addr [2..5]
-        {0x28, 0, 0, 0x00000000}, {0x15, 8, 9, 0x00001122}, // 6: replace with AL MAC Addr [0..1]
-        {0x15, 0, 8, 0x99aabbcc},                           // 7: replace with IF MAC Addr [2..5]
-        {0x28, 0, 0, 0x00000000}, {0x15, 5, 6, 0x00007788}, // 9: replace with IF MAC Addr [0..1]
-        {0x15, 0, 5, 0x000088cc}, {0x20, 0, 0, 0x00000002}, {0x15, 0, 3, 0xc200000e},
-        {0x28, 0, 0, 0x00000000}, {0x15, 0, 1, 0x00000180}, {0x6, 0, 0, 0x0000ffff},
+        {0x28, 0, 0, 0x0000000c},
+        {0x15, 0, 8, 0x0000893a},
+        {0x20, 0, 0, 0x00000002},
+        {0x15, 9, 0, 0xc2000013},
+        {0x15, 0, 2, 0x33445566}, // 4: replace with AL MAC Addr [2..5]
+        {0x28, 0, 0, 0x00000000},
+        {0x15, 8, 9, 0x00001122}, // 6: replace with AL MAC Addr [0..1]
+        {0x15, 0, 8, 0x99aabbcc}, // 7: replace with IF MAC Addr [2..5]
+        {0x28, 0, 0, 0x00000000},
+        {0x15, 5, 6, 0x00007788}, // 9: replace with IF MAC Addr [0..1]
+        {0x15, 0, 5, 0x000088cc},
+        {0x20, 0, 0, 0x00000002},
+        {0x15, 0, 3, 0xc200000e},
+        {0x28, 0, 0, 0x00000000},
+        {0x15, 0, 1, 0x00000180},
+        {0x6, 0, 0, 0x0000ffff},
         {0x6, 0, 0, 0x00000000},
     };
 
-    unsigned char al_mac_addr_[6] = { 0 };
+    unsigned char al_mac_addr_[6] = {0};
 
     (((uint32_t)al_mac_addr_[2]) << 24);
 
@@ -74,28 +93,15 @@ static int attach_bpf_filters(NetworkInterface *interface)
     struct sock_fprog bpf = {.len = (sizeof(code) / sizeof((code)[0])), .filter = code};
 
     // Attach the filter
-    if (setsockopt(interface->fd, SOL_SOCKET, SO_ATTACH_FILTER, &bpf, sizeof(bpf)) == -1) {
+    if (setsockopt(interface->fd, SOL_SOCKET, SO_ATTACH_FILTER, &bpf, sizeof(bpf)) == -1)
+    {
         return -1;
     }
     return 0;
 }
 
-
-int if_sock_create(NetworkInterface *interface)
+static int linux_if_create(NetworkInterface *interface)
 {
-    if (!interface)
-    {
-        return -1;
-    }
-    if (interface->fd)
-    {
-        return -1;
-    }
-    if (interface->ifname[0] == '\0')
-    {
-        return -1;
-    }
-
     int sk = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sk < 0)
     {
@@ -123,16 +129,32 @@ int if_sock_create(NetworkInterface *interface)
         interface->fd = 0;
         return -1;
     }
-    
+
     return 0;
 }
 
-void if_sock_destroy(NetworkInterface *interface)
+int if_create(NetworkInterface *interface)
 {
     if (!interface)
     {
-        return;
+        return -1;
     }
+    if (interface->fd)
+    {
+        return -1;
+    }
+    if (interface->ifname[0] == '\0')
+    {
+        return -1;
+    }
+
+    interface->ops = &if_ops;
+
+    return interface->ops->create(interface);
+}
+
+static void linux_if_release(NetworkInterface *interface)
+{
     if (interface->fd)
     {
         close(interface->fd);
@@ -141,16 +163,44 @@ void if_sock_destroy(NetworkInterface *interface)
     return;
 }
 
-int if_sock_send(NetworkInterface *interface, void *buf, int size)
+void if_release(NetworkInterface *interface)
 {
     if (!interface)
     {
-        return -1;
+        return;
     }
+
+    interface->ops->release(interface);
+
+    return;
+}
+
+static int linux_if_send(NetworkInterface *interface, void *buf, int size)
+{
     if (!interface->fd)
     {
         return -1;
     }
 
     return send(interface->fd, buf, size, 0);
+}
+
+int if_send(NetworkInterface *interface, void *buf, int size)
+{
+    if (!interface)
+    {
+        return -1;
+    }
+
+    return interface->ops->send_msg(interface, buf, size);
+}
+
+int linux_sock_init()
+{
+    return 0;
+}
+
+void linux_sock_exit()
+{
+    return;
 }

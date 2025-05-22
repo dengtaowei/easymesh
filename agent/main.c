@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
     interface.addr[4] = 0x78; // 00:0c:29:09:78:b7
     interface.addr[5] = 0xb7; // 00:0c:29:09:78:b7
     snprintf(interface.ifname, sizeof(interface.ifname), "%s", "ens32");
-    ret = if_sock_create(&interface);
+    ret = if_create(&interface);
     if (ret)
     {
         printf("sk create error\n");
@@ -188,7 +188,7 @@ int main(int argc, char *argv[])
     // 进入事件主循环
     event_base_dispatch(base);
     event_base_free(base);
-    if_sock_destroy(&interface);
+    if_release(&interface);
 
     return 0;
 }

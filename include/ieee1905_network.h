@@ -5,6 +5,15 @@
 #include <net/if.h>
 #include "list.h"
 
+typedef struct _NetworkInterface NetworkInterface;
+
+typedef struct _interface_ops
+{
+    int (*create)(NetworkInterface *interface);
+    void (*release)(NetworkInterface *interface);
+    int (*send_msg)(NetworkInterface *interface, void *buf, int size);
+} interface_ops;
+
 typedef struct _NetworkInterface
 {
     int fd;
@@ -16,10 +25,11 @@ typedef struct _NetworkInterface
     KamiList nbr_1905;
     struct event_base *base;
     struct event *topo_timer;
+    interface_ops *ops;
 } NetworkInterface;
 
-int if_sock_create(NetworkInterface *interface);
-void if_sock_destroy(NetworkInterface *interface);
-int if_sock_send(NetworkInterface *interface, void *buf, int size);
+int if_create(NetworkInterface *interface);
+void if_release(NetworkInterface *interface);
+int if_send(NetworkInterface *interface, void *buf, int size);
 
 #endif
