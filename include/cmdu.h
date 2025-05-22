@@ -5,4 +5,5 @@
 int send_topology_discovery(NetworkInterface *interface);
 int send_topology_query(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id);
 int send_topology_response(NetworkInterface *interface, unsigned char *dest, unsigned short msg_id);
+int cmdu_handle(NetworkInterface *interface, void *buf, int size);
 #endif

@@ -189,3 +189,39 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
 
     return if_send(interface, raw_msg, offset);
 }
+
+int cmdu_handle(NetworkInterface *interface, void *buf, int size)
+{
+    cmdu_raw_msg *msg = (cmdu_raw_msg *)buf;
+    unsigned short type = ntohs(msg->msg_1905.hdr.msg_type);
+    if (type == MSG_TOPOLOGY_DISCOBERY)
+    {
+        printf("topo discovery received from %02x:%02x:%02x:%02x:%02x:%02x\n",
+               msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
+               msg->src_addr[4], msg->src_addr[5]);
+        if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
+        {
+            nbr_1905dev *nbr = (nbr_1905dev *)malloc(sizeof(nbr_1905dev));
+            if (nbr)
+            {
+                memset(nbr, 0, sizeof(nbr_1905dev));
+                memcpy(nbr->al_addr, msg->src_addr, ETH_ALEN);
+                add_1905_nbr(interface, nbr);
+                send_topology_query(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
+            }
+            
+        }
+    }
+    else if (type == MSG_TOPOLOGY_QUERY)
+    {
+        printf("topo query received from %02x:%02x:%02x:%02x:%02x:%02x\n",
+               msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
+               msg->src_addr[4], msg->src_addr[5]);
+        if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
+        {
+            send_topology_response(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
+        }
+    }
+
+    return 0;
+}
