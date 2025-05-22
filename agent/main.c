@@ -165,8 +165,8 @@ int main(int argc, char *argv[])
     interface.addr[3] = 0x09; // 00:0c:29:09:78:b7
     interface.addr[4] = 0x78; // 00:0c:29:09:78:b7
     interface.addr[5] = 0xb7; // 00:0c:29:09:78:b7
-    snprintf(interface.ifname, sizeof(interface.ifname), "%s", "ens32");
-    ret = if_create(&interface);
+    
+    ret = if_create(&interface, "ens33");
     if (ret)
     {
         printf("sk create error\n");

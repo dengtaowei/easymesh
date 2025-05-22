@@ -23,7 +23,7 @@
 #include <arpa/inet.h>
 #include "ieee1905_network.h"
 
-static int linux_if_create(NetworkInterface *interface);
+static int linux_if_create(NetworkInterface *interface, const char *ifname);
 static void linux_if_release(NetworkInterface *interface);
 static int linux_if_send(NetworkInterface *interface, void *buf, int size);
 
@@ -100,8 +100,10 @@ static int attach_bpf_filters(NetworkInterface *interface)
     return 0;
 }
 
-static int linux_if_create(NetworkInterface *interface)
+static int linux_if_create(NetworkInterface *interface, const char *ifname)
 {
+    snprintf(interface->ifname, sizeof(interface->ifname), "%s", ifname);
+
     int sk = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sk < 0)
     {
@@ -133,9 +135,9 @@ static int linux_if_create(NetworkInterface *interface)
     return 0;
 }
 
-int if_create(NetworkInterface *interface)
+int if_create(NetworkInterface *interface, const char *ifname)
 {
-    if (!interface)
+    if (!interface || !ifname || ifname[0] == '\0')
     {
         return -1;
     }
@@ -143,14 +145,10 @@ int if_create(NetworkInterface *interface)
     {
         return -1;
     }
-    if (interface->ifname[0] == '\0')
-    {
-        return -1;
-    }
 
     interface->ops = &if_ops;
 
-    return interface->ops->create(interface);
+    return interface->ops->create(interface, ifname);
 }
 
 static void linux_if_release(NetworkInterface *interface)

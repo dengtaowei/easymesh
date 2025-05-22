@@ -9,7 +9,7 @@ typedef struct _NetworkInterface NetworkInterface;
 
 typedef struct _interface_ops
 {
-    int (*create)(NetworkInterface *interface);
+    int (*create)(NetworkInterface *interface, const char *ifname);
     void (*release)(NetworkInterface *interface);
     int (*send_msg)(NetworkInterface *interface, void *buf, int size);
 } interface_ops;
@@ -28,7 +28,7 @@ typedef struct _NetworkInterface
     interface_ops *ops;
 } NetworkInterface;
 
-int if_create(NetworkInterface *interface);
+int if_create(NetworkInterface *interface, const char *ifname);
 void if_release(NetworkInterface *interface);
 int if_send(NetworkInterface *interface, void *buf, int size);
 
