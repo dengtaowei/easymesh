@@ -158,15 +158,8 @@ int main(int argc, char *argv[])
     int ret = 0;
     NetworkInterface interface;
     memset(&interface, 0, sizeof(interface));
-    interface.base = base;
-    interface.addr[0] = 0x00; // 00:0c:29:09:78:b7
-    interface.addr[1] = 0x0c; // 00:0c:29:09:78:b7
-    interface.addr[2] = 0x29; // 00:0c:29:09:78:b7
-    interface.addr[3] = 0x09; // 00:0c:29:09:78:b7
-    interface.addr[4] = 0x78; // 00:0c:29:09:78:b7
-    interface.addr[5] = 0xb7; // 00:0c:29:09:78:b7
     
-    ret = if_create(&interface, "ens33");
+    ret = if_create(&interface, "ens33", (void *)base);
     if (ret)
     {
         printf("sk create error\n");

@@ -26,11 +26,13 @@
 static int linux_if_create(NetworkInterface *interface, const char *ifname);
 static void linux_if_release(NetworkInterface *interface);
 static int linux_if_send(NetworkInterface *interface, void *buf, int size);
+static int linux_if_get_mac(NetworkInterface *interface, unsigned char *mac);
 
 interface_ops if_ops = {
     .create = linux_if_create,
     .release = linux_if_release,
     .send_msg = linux_if_send,
+    .get_mac_addr = linux_if_get_mac,
 };
 
 static int attach_bpf_filters(NetworkInterface *interface)
@@ -102,7 +104,7 @@ static int attach_bpf_filters(NetworkInterface *interface)
 
 static int linux_if_create(NetworkInterface *interface, const char *ifname)
 {
-    snprintf(interface->ifname, sizeof(interface->ifname), "%s", ifname);
+    int ret = 0;
 
     int sk = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sk < 0)
@@ -123,7 +125,7 @@ static int linux_if_create(NetworkInterface *interface, const char *ifname)
         return -1;
     }
     interface->fd = sk;
-    int ret = attach_bpf_filters(interface);
+    ret = attach_bpf_filters(interface);
     if (ret)
     {
         printf("attach error %s\n", strerror(errno));
@@ -135,7 +137,7 @@ static int linux_if_create(NetworkInterface *interface, const char *ifname)
     return 0;
 }
 
-int if_create(NetworkInterface *interface, const char *ifname)
+int if_create(NetworkInterface *interface, const char *ifname, void *priv_data)
 {
     if (!interface || !ifname || ifname[0] == '\0')
     {
@@ -147,6 +149,15 @@ int if_create(NetworkInterface *interface, const char *ifname)
     }
 
     interface->ops = &if_ops;
+
+    snprintf(interface->ifname, sizeof(interface->ifname), "%s", ifname);
+    interface->priv_data = priv_data;
+
+    int ret = interface->ops->get_mac_addr(interface, interface->addr);
+    if (ret < 0)
+    {
+        return -1;
+    }
 
     return interface->ops->create(interface, ifname);
 }
@@ -191,6 +202,42 @@ int if_send(NetworkInterface *interface, void *buf, int size)
     }
 
     return interface->ops->send_msg(interface, buf, size);
+}
+
+static int linux_if_get_mac(NetworkInterface *interface, unsigned char *mac)
+{
+    int sockfd;
+    struct ifreq ifr;
+
+    // 创建UDP套接字（仅用于ioctl调用）
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    {
+        return -1;
+    }
+
+    // 设置要查询的网卡名称
+    strncpy(ifr.ifr_name, interface->ifname, IF_NAMESIZE - 1);
+
+    // 获取MAC地址
+    if (ioctl(sockfd, SIOCGIFHWADDR, &ifr) < 0)
+    {
+        close(sockfd);
+        return -1;
+    }
+
+    // 打印MAC地址（6字节十六进制）
+    memcpy(mac, ifr.ifr_ifru.ifru_hwaddr.sa_data, ETH_ALEN);
+
+    close(sockfd);
+}
+
+int if_get_mac(NetworkInterface *interface, unsigned char *mac)
+{
+    if (!interface || !mac || interface->ifname[0] == '\0')
+    {
+        return -1;
+    }
+    return interface->ops->get_mac_addr(interface, mac);
 }
 
 int linux_sock_init()

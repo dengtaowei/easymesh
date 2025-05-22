@@ -14,7 +14,6 @@ KamiList interfaces = {
     .size = 0,
 };
 
-
 void send_discovery_perodic(int sockfd, short what, void *arg)
 {
     NetworkInterface *interface = (NetworkInterface *)arg;
@@ -40,13 +39,14 @@ int register_interface(NetworkInterface *interface)
     KamiListAddTail(&interfaces, &interface->ifnode);
 
     // 定时器，非持久事件
-    interface->topo_timer = evtimer_new(interface->base, send_discovery_perodic, interface);
+    interface->topo_timer = evtimer_new((struct event_base *)interface->priv_data,
+                                        send_discovery_perodic, interface);
     if (!interface->topo_timer)
     {
         printf("timer error\n");
         return 1;
     }
-    struct timeval t1 = {1, 0}; // 1秒0毫秒
+    struct timeval t1 = {1, 0};              // 1秒0毫秒
     evtimer_add(interface->topo_timer, &t1); // 插入性能 O(logn)
 
     return 0;
@@ -69,7 +69,7 @@ void del_1905_nbr(NetworkInterface *interface, unsigned char *almac)
 {
     KamiListIterrator *iter = KamiListGetIter(&interface->nbr_1905, Iter_From_Head);
     KamiListNode *tmp = NULL;
-    while((tmp = KamiListNext(iter)) != NULL)
+    while ((tmp = KamiListNext(iter)) != NULL)
     {
         nbr_1905dev *dev = container_of(tmp, nbr_1905dev, node);
         if (0 == memcmp(almac, dev->al_addr, ETH_ALEN))

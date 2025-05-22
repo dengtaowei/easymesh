@@ -8,7 +8,7 @@ export INCLUDE_PATH = $(BUILD_ROOT)/include
 
 #定义我们要编译的目录
 BUILD_DIR = $(BUILD_ROOT)/agent/ \
-			# $(BUILD_ROOT)/proc/   \
+			$(BUILD_ROOT)/util/   \
 			# $(BUILD_ROOT)/net/    \
 			# $(BUILD_ROOT)/misc/   \
 			# $(BUILD_ROOT)/logic/   \
