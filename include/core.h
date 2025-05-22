@@ -15,4 +15,6 @@ void unregister_interface(NetworkInterface *interface);
 
 void add_1905_nbr(NetworkInterface *interface, nbr_1905dev *nbr);
 
+nbr_1905dev *search_1905_nbr(NetworkInterface *interface, const char *almac);
+
 #endif

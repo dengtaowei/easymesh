@@ -201,6 +201,11 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
                msg->src_addr[4], msg->src_addr[5]);
         if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
         {
+            if (search_1905_nbr(interface, (const char *)msg->src_addr))
+            {
+               printf("dev existed\n");
+               return 0;
+            }
             nbr_1905dev *nbr = (nbr_1905dev *)malloc(sizeof(nbr_1905dev));
             if (nbr)
             {

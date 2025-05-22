@@ -65,6 +65,22 @@ void add_1905_nbr(NetworkInterface *interface, nbr_1905dev *nbr)
     return;
 }
 
+nbr_1905dev *search_1905_nbr(NetworkInterface *interface, const char *almac)
+{
+    KamiListIterrator *iter = KamiListGetIter(&interface->nbr_1905, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while ((tmp = KamiListNext(iter)) != NULL)
+    {
+        nbr_1905dev *dev = container_of(tmp, nbr_1905dev, node);
+        if (0 == memcmp(almac, dev->al_addr, ETH_ALEN))
+        {
+            return dev;
+        }
+    }
+    KamiListDelIterator(iter);
+    return NULL;
+}
+
 void del_1905_nbr(NetworkInterface *interface, unsigned char *almac)
 {
     KamiListIterrator *iter = KamiListGetIter(&interface->nbr_1905, Iter_From_Head);
