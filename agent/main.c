@@ -106,13 +106,15 @@ void client_read_cb(struct bufferevent *bev, void *arg)
 {
     // cout << "[client_R]" << flush;
     printf("client_R\n");
+    char data[1024] = {0};
+    
     NetworkInterface *interface = (NetworkInterface *)arg;
-    struct evbuffer *input = bufferevent_get_input(bev);
-    struct evbuffer *output = bufferevent_get_output(bev);
-    size_t len = evbuffer_get_length(input);
-    char *data;
-    data = (char *)malloc(len);
-    evbuffer_remove(input, data, len);
+    if(if_recv(interface, data, sizeof(data)) <= 0)
+    {
+        printf("recv err\n");
+        return;
+    }
+    
     cmdu_raw_msg *msg = (cmdu_raw_msg *)data;
     unsigned short type = ntohs(msg->msg_1905.hdr.msg_type);
     if (type == MSG_TOPOLOGY_DISCOBERY)
@@ -143,7 +145,6 @@ void client_read_cb(struct bufferevent *bev, void *arg)
             send_topology_response(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
         }
     }
-    free(data);
 }
 
 int main(int argc, char *argv[])

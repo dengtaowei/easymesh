@@ -26,12 +26,14 @@
 static int linux_if_create(NetworkInterface *interface, const char *ifname);
 static void linux_if_release(NetworkInterface *interface);
 static int linux_if_send(NetworkInterface *interface, void *buf, int size);
+static int linux_if_recv(NetworkInterface *interface, void *buf, int size);
 static int linux_if_get_mac(NetworkInterface *interface, unsigned char *mac);
 
 interface_ops if_ops = {
     .create = linux_if_create,
     .release = linux_if_release,
     .send_msg = linux_if_send,
+    .recv_msg = linux_if_recv,
     .get_mac_addr = linux_if_get_mac,
 };
 
@@ -191,7 +193,7 @@ static int linux_if_send(NetworkInterface *interface, void *buf, int size)
         return -1;
     }
 
-    return send(interface->fd, buf, size, 0);
+    return send(interface->fd, buf, size, MSG_NOSIGNAL);
 }
 
 int if_send(NetworkInterface *interface, void *buf, int size)
@@ -202,6 +204,25 @@ int if_send(NetworkInterface *interface, void *buf, int size)
     }
 
     return interface->ops->send_msg(interface, buf, size);
+}
+
+static int linux_if_recv(NetworkInterface *interface, void *buf, int size)
+{
+    if (!interface->fd)
+    {
+        return -1;
+    }
+
+    return recv(interface->fd, buf, size, 0);
+}
+
+int if_recv(NetworkInterface *interface, void *buf, int size)
+{
+    if (!interface || !buf || size <= 0)
+    {
+        return -1;
+    }
+    return interface->ops->recv_msg(interface, buf, size);
 }
 
 static int linux_if_get_mac(NetworkInterface *interface, unsigned char *mac)
