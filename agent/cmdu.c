@@ -77,14 +77,14 @@ int send_topology_discovery(NetworkInterface *interface)
     int offset = 0;
 
     memcpy(raw_msg->dest_addr, dest_addr, ETH_ALEN);
-    memcpy(raw_msg->src_addr, interface->addr, ETH_ALEN);
+    memcpy(raw_msg->src_addr, interface->al_addr, ETH_ALEN);
     raw_msg->proto = htons(0x893a);
     raw_msg->msg_1905.hdr.Flags_last_fragment = 1;
 
     offset += sizeof(cmdu_raw_msg);
 
     KamiTlv_S *pstRoot = Kami_Tlv_CreateObject();
-    Kami_Tlv_AddTlvToObject(pstRoot, 0x01, ETH_ALEN, interface->addr);
+    Kami_Tlv_AddTlvToObject(pstRoot, 0x01, ETH_ALEN, interface->al_addr);
     Kami_Tlv_AddTlvToObject(pstRoot, 0x02, ETH_ALEN, interface->addr);
     static unsigned char ie[] = {0x00, 0x0c, 0xe7, 0xff, 0x00, 0x0c, 0xe7, 0x00};
     Kami_Tlv_AddTlvToObject(pstRoot, 0x0b, 8, ie);
@@ -131,7 +131,7 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
     int offset = 0;
 
     memcpy(raw_msg->dest_addr, dest, ETH_ALEN);
-    memcpy(raw_msg->src_addr, interface->addr, ETH_ALEN);
+    memcpy(raw_msg->src_addr, interface->al_addr, ETH_ALEN);
     raw_msg->proto = htons(0x893a);
     raw_msg->msg_1905.hdr.msg_type = htons(MSG_TOPOLOGY_RESPONSE);
     raw_msg->msg_1905.hdr.Flags_last_fragment = 1;
@@ -142,7 +142,7 @@ int send_topology_response(NetworkInterface *interface, unsigned char *dest, uns
     KamiTlv_S *pstRoot = Kami_Tlv_CreateObject();
     tlv_type_1905_device_info dev_info;
     memset(&dev_info, 0, sizeof(dev_info));
-    memcpy(dev_info.al_mac, interface->addr, ETH_ALEN);
+    memcpy(dev_info.al_mac, interface->al_addr, ETH_ALEN);
     dev_info.local_if_count = 1;
     memcpy(dev_info.if_devs[0].mac, interface->addr, ETH_ALEN);
     dev_info.if_devs[0].media_type = 0x0000;
@@ -199,7 +199,7 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
         printf("topo discovery received from %02x:%02x:%02x:%02x:%02x:%02x\n",
                msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
                msg->src_addr[4], msg->src_addr[5]);
-        if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
+        if (memcmp(interface->al_addr, msg->src_addr, ETH_ALEN) != 0)
         {
             if (search_1905_nbr(interface, (const char *)msg->src_addr))
             {
@@ -222,7 +222,7 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
         printf("topo query received from %02x:%02x:%02x:%02x:%02x:%02x\n",
                msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
                msg->src_addr[4], msg->src_addr[5]);
-        if (memcmp(interface->addr, msg->src_addr, ETH_ALEN) != 0)
+        if (memcmp(interface->al_addr, msg->src_addr, ETH_ALEN) != 0)
         {
             send_topology_response(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
         }

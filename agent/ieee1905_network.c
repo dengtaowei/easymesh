@@ -59,39 +59,59 @@ static int attach_bpf_filters(NetworkInterface *interface)
     // tcpdump -dd '(ether proto 0x893a and (ether dst 01:80:c2:00:00:13 or ether dst 11:22:33:44:55:66 or ether dst 77:88:99:aa:bb:cc)) or (ether proto 0x88cc and ether dst 01:80:c2:00:00:0e)'
     //
     // The two dummy addresses in this filter 11:22... and 77:88... will be replaced in runtime with the AL MAC address and the interface's HW address
-    struct sock_filter code[17] = {
+    // struct sock_filter code[17] = {
+    //     {0x28, 0, 0, 0x0000000c}, {0x15, 0, 8, 0x0000893a}, {0x20, 0, 0, 0x00000002},
+    //     {0x15, 9, 0, 0xc2000013}, {0x15, 0, 2, 0x33445566}, // 4: replace with AL MAC Addr [2..5]
+    //     {0x28, 0, 0, 0x00000000}, {0x15, 8, 9, 0x00001122}, // 6: replace with AL MAC Addr [0..1]
+    //     {0x15, 0, 8, 0x99aabbcc},                           // 7: replace with IF MAC Addr [2..5]
+    //     {0x28, 0, 0, 0x00000000}, {0x15, 5, 6, 0x00007788}, // 9: replace with IF MAC Addr [0..1]
+    //     {0x15, 0, 5, 0x000088cc}, {0x20, 0, 0, 0x00000002}, {0x15, 0, 3, 0xc200000e},
+    //     {0x28, 0, 0, 0x00000000}, {0x15, 0, 1, 0x00000180}, {0x6, 0, 0, 0x0000ffff},
+    //     {0x6, 0, 0, 0x00000000},
+    // };
+
+    // unsigned char al_mac_addr_[6] = {0};
+
+    struct sock_filter code[] = {
         {0x28, 0, 0, 0x0000000c},
-        {0x15, 0, 8, 0x0000893a},
+        {0x15, 0, 11, 0x0000893a},
         {0x20, 0, 0, 0x00000002},
-        {0x15, 9, 0, 0xc2000013},
-        {0x15, 0, 2, 0x33445566}, // 4: replace with AL MAC Addr [2..5]
+        {0x15, 0, 2, 0xc2000013},
         {0x28, 0, 0, 0x00000000},
-        {0x15, 8, 9, 0x00001122}, // 6: replace with AL MAC Addr [0..1]
-        {0x15, 0, 8, 0x99aabbcc}, // 7: replace with IF MAC Addr [2..5]
+        {0x15, 6, 7, 0x00000180},
+        {0x15, 0, 2, 0x33445566}, // 6
         {0x28, 0, 0, 0x00000000},
-        {0x15, 5, 6, 0x00007788}, // 9: replace with IF MAC Addr [0..1]
-        {0x15, 0, 5, 0x000088cc},
-        {0x20, 0, 0, 0x00000002},
-        {0x15, 0, 3, 0xc200000e},
+        {0x15, 3, 4, 0x00001122}, // 8
+        {0x15, 0, 3, 0x99aabbcc}, // 9
         {0x28, 0, 0, 0x00000000},
-        {0x15, 0, 1, 0x00000180},
-        {0x6, 0, 0, 0x0000ffff},
+        {0x15, 0, 1, 0x00007788}, // 11
+        {0x6, 0, 0, 0x00040000},
         {0x6, 0, 0, 0x00000000},
     };
 
-    unsigned char al_mac_addr_[6] = {0};
-
-    (((uint32_t)al_mac_addr_[2]) << 24);
 
     // Replace dummy values with AL MAC
-    code[4].k = (((uint32_t)al_mac_addr_[2]) << 24) | (((uint32_t)al_mac_addr_[3]) << 16) |
-                (((uint32_t)al_mac_addr_[4]) << 8) | (((uint32_t)al_mac_addr_[5]) << 24);
-    code[6].k = (((uint32_t)al_mac_addr_[0]) << 8) | (((uint32_t)al_mac_addr_[1]) << 24);
+    code[6].k = (((uint32_t)interface->al_addr[2]) << 24) | (((uint32_t)interface->al_addr[3]) << 16) |
+                (((uint32_t)interface->al_addr[4]) << 8) | (((uint32_t)interface->al_addr[5]));
+    printf("%02x:%02x:%02x:%02x:%02x:%02x\n", interface->al_addr[0], interface->al_addr[1], 
+    interface->al_addr[2], interface->al_addr[3], interface->al_addr[4], interface->al_addr[5]);
+    printf("%x\n", code[6].k);
+    code[8].k = (((uint32_t)interface->al_addr[0]) << 8) | (((uint32_t)interface->al_addr[1]));
 
     // Replace dummy values with the Interface MAC
-    code[7].k = (((uint32_t)interface->addr[2]) << 24) | (((uint32_t)interface->addr[3]) << 16) |
+    code[9].k = (((uint32_t)interface->addr[2]) << 24) | (((uint32_t)interface->addr[3]) << 16) |
                 (((uint32_t)interface->addr[4]) << 8) | (((uint32_t)interface->addr[5]));
-    code[9].k = (((uint32_t)interface->addr[0]) << 8) | (((uint32_t)interface->addr[1]));
+    code[11].k = (((uint32_t)interface->addr[0]) << 8) | (((uint32_t)interface->addr[1]));
+
+    // // Replace dummy values with AL MAC
+    // code[4].k = (((uint32_t)al_mac_addr_[2]) << 24) | (((uint32_t)al_mac_addr_[3]) << 16) |
+    //             (((uint32_t)al_mac_addr_[4]) << 8) | (((uint32_t)al_mac_addr_[5]) << 24);
+    // code[6].k = (((uint32_t)al_mac_addr_[0]) << 8) | (((uint32_t)al_mac_addr_[1]) << 24);
+
+    // // Replace dummy values with the Interface MAC
+    // code[7].k = (((uint32_t)interface->addr[2]) << 24) | (((uint32_t)interface->addr[3]) << 16) |
+    //             (((uint32_t)interface->addr[4]) << 8) | (((uint32_t)interface->addr[5]));
+    // code[9].k = (((uint32_t)interface->addr[0]) << 8) | (((uint32_t)interface->addr[1]));
 
     // BPF filter structure
     struct sock_fprog bpf = {.len = (sizeof(code) / sizeof((code)[0])), .filter = code};

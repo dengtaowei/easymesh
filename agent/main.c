@@ -131,6 +131,13 @@ int main(int argc, char *argv[])
     int ret = 0;
     NetworkInterface interface;
     memset(&interface, 0, sizeof(interface));
+ 	// 5a:9a:94:c0:42:57
+    interface.al_addr[0] = 0x5a;
+    interface.al_addr[1] = 0x9a;
+    interface.al_addr[2] = 0x94;
+    interface.al_addr[3] = 0xc0;
+    interface.al_addr[4] = 0x42;
+    interface.al_addr[5] = 0x57;
     
     ret = if_create(&interface, "ens33", (void *)base);
     if (ret)
