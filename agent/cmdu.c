@@ -312,9 +312,25 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
     }
     else if (type == MSG_AP_AUTOCONFIGURATION_RENEW)
     {
+
         printf("auto configuration renew received from %02x:%02x:%02x:%02x:%02x:%02x\n",
                msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
                msg->src_addr[4], msg->src_addr[5]);
+        KamiTlv_S *pstRenew = Kami_Tlv_ParseObject(msg->tlvs, size - sizeof(cmdu_raw_msg), 1);
+        if (pstRenew)
+        {
+            KamiTlv_S *pstFreqBand = Kami_Tlv_GetObjectItem(pstRenew, 0x10);
+            if (pstFreqBand)
+            {
+                printf("radio %d\n", *((char *)pstFreqBand->value));
+                if (*((char *)pstFreqBand->value) == 1)
+                {
+                    return 0;
+                }
+            }
+            int i;
+            i++;
+        }
         if (memcmp(interface->al_addr, msg->src_addr, ETH_ALEN) != 0)
         {
             send_wsc_m1(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);

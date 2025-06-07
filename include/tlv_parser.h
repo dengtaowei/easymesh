@@ -41,6 +41,8 @@ int Kami_Tlv_AddItemToObject(KamiTlv_S *pstTlv, KamiTlv_S *pstItem);
 unsigned char *Kami_Tlv_Print(KamiTlv_S *pstTlv);
 int Kami_Tlv_ObjectLength(KamiTlv_S *pstObject);
 void Kami_Tlv_Delete(KamiTlv_S *pstTlv);
+KamiTlv_S *Kami_Tlv_ParseObject(void *pTlvData, int iLength, int len);
+KamiTlv_S *Kami_Tlv_GetObjectItem(KamiTlv_S *pstObject, tlv_type usType);
 
 
 #endif

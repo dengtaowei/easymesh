@@ -115,6 +115,8 @@ void client_read_cb(struct bufferevent *bev, void *arg)
         printf("recv err\n");
         return;
     }
+
+    printf("=========== recv tytes %d===========\n", recv_b);
     
     cmdu_handle(interface, data, recv_b);
 }
