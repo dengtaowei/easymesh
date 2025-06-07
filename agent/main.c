@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
     interface.al_addr[4] = 0x42;
     interface.al_addr[5] = 0x57;
     
-    ret = if_create(&interface, "ens33", (void *)base);
+    ret = if_create(&interface, "ens32", (void *)base);
     if (ret)
     {
         printf("sk create error\n");

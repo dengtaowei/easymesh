@@ -270,6 +270,7 @@ static int linux_if_get_mac(NetworkInterface *interface, unsigned char *mac)
     memcpy(mac, ifr.ifr_ifru.ifru_hwaddr.sa_data, ETH_ALEN);
 
     close(sockfd);
+    return 0;
 }
 
 int if_get_mac(NetworkInterface *interface, unsigned char *mac)

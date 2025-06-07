@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 
-typedef unsigned char tlv_type;
+typedef unsigned short tlv_type;
 typedef unsigned short tlv_len;
 
 
@@ -15,6 +15,7 @@ typedef struct tagKamiTlv
     struct tagKamiTlv *parent;
 
     tlv_type type;
+    char type_len;
     tlv_len length;
     int obj_type;
     char *value;
@@ -33,9 +34,9 @@ typedef struct
 #define KamiTlv_Array (1 << 2)
 
 
-KamiTlv_S *Kami_Tlv_CreateObject();
-KamiTlv_S *Kami_Tlv_CreateArray(tlv_type usType);
-int Kami_Tlv_AddTlvToObject(KamiTlv_S *pstTlv, tlv_type usType, tlv_len usLength, void *pValue);
+KamiTlv_S *Kami_Tlv_CreateObject(int len);
+KamiTlv_S *Kami_Tlv_CreateArray(tlv_type usType, int len);
+int Kami_Tlv_AddTlvToObject(KamiTlv_S *pstTlv, tlv_type usType, tlv_len usLength, void *pValue, int len);
 int Kami_Tlv_AddItemToObject(KamiTlv_S *pstTlv, KamiTlv_S *pstItem);
 unsigned char *Kami_Tlv_Print(KamiTlv_S *pstTlv);
 int Kami_Tlv_ObjectLength(KamiTlv_S *pstObject);

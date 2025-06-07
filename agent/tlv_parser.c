@@ -19,14 +19,14 @@ unsigned short big2littles(unsigned short be)
     return swapped;
 }
 
-tlv_type little2bigs_type(tlv_type num)
+tlv_type little2bigs_type(tlv_type num, int len)
 {
     tlv_type swapped;
-    if (sizeof(tlv_type) == 2)
+    if (len == 2)
     {
         swapped = (num << 8) | (num >> 8);
     }
-    else if(sizeof(tlv_type) == 1)
+    else if(len == 1)
     {
         swapped = num;
     }
@@ -35,14 +35,14 @@ tlv_type little2bigs_type(tlv_type num)
 }
 
 //大端转小端
-tlv_type big2littles_type(tlv_type be)
+tlv_type big2littles_type(tlv_type be, int len)
 {
     tlv_type swapped;
-    if (sizeof(tlv_type) == 2)
+    if (len == 2)
     {
         swapped = (be << 8) | (be >> 8);
     }
-    else if(sizeof(tlv_type) == 1)
+    else if(len == 1)
     {
         swapped = be;
     }
@@ -84,8 +84,8 @@ tlv_len big2littles_len(tlv_len be)
 #define htons little2bigs
 #define ntohs big2littles
 
-#define htons_type little2bigs_type
-#define ntohs_type big2littles_type
+#define htons_type(num, len) little2bigs_type(num, len)
+#define ntohs_type(num, len) big2littles_type(num, len)
 
 #define htons_len little2bigs_len
 #define ntohs_len big2littles_len
@@ -93,7 +93,7 @@ tlv_len big2littles_len(tlv_len be)
 void Kami_Tlv_Delete(KamiTlv_S *pstTlv);
 int Kami_Tlv_PrintValue(KamiTlv_S *pstItem, KamiTlvPrintBuffer *output_buffer);
 
-KamiTlv_S *Kami_Tlv_CreateObject()
+KamiTlv_S *Kami_Tlv_CreateObject(int type_len)
 {
     KamiTlv_S *pstTlv = (KamiTlv_S *)malloc(sizeof(KamiTlv_S));
     if (!pstTlv)
@@ -102,10 +102,11 @@ KamiTlv_S *Kami_Tlv_CreateObject()
     }
     memset(pstTlv, 0, sizeof(KamiTlv_S));
     pstTlv->obj_type = KamiTlv_Object;
+    pstTlv->type_len = type_len;
     return pstTlv;
 }
 
-KamiTlv_S *Kami_Tlv_CreateArray(tlv_type usType)
+KamiTlv_S *Kami_Tlv_CreateArray(tlv_type usType, int len)
 {
     KamiTlv_S *pstTlv = (KamiTlv_S *)malloc(sizeof(KamiTlv_S));
     if (!pstTlv)
@@ -115,15 +116,17 @@ KamiTlv_S *Kami_Tlv_CreateArray(tlv_type usType)
     memset(pstTlv, 0, sizeof(KamiTlv_S));
     pstTlv->obj_type = KamiTlv_Array;
     pstTlv->type = usType;
+    pstTlv->type_len = len;
     return pstTlv;
 }
 
-KamiTlv_S *Kami_Tlv_CreateTlv(tlv_type usType, tlv_len usLength, void *pValue)
+KamiTlv_S *Kami_Tlv_CreateTlv(tlv_type usType, tlv_len usLength, void *pValue, int len)
 {
-    KamiTlv_S *pstTlv = Kami_Tlv_CreateObject();
+    KamiTlv_S *pstTlv = Kami_Tlv_CreateObject(len);
     if (pstTlv)
     {
         pstTlv->type = usType;
+        pstTlv->type_len = len;
         pstTlv->length = usLength;
         if (usLength)
         {
@@ -187,7 +190,7 @@ int Kami_Tlv_AddItemToObject(KamiTlv_S *pstTlv, KamiTlv_S *pstItem)
 
     if (pstItem->obj_type == KamiTlv_Tlv || pstItem->obj_type == KamiTlv_Array)
     {
-        usIncLength = (sizeof(tlv_type) + sizeof(tlv_len) + pstItem->length);
+        usIncLength = (pstTlv->type_len + sizeof(tlv_len) + pstItem->length);
     }
     else if (pstItem->obj_type == KamiTlv_Object)
     {
@@ -208,9 +211,9 @@ int Kami_Tlv_AddItemToObject(KamiTlv_S *pstTlv, KamiTlv_S *pstItem)
     return 0;
 }
 
-int Kami_Tlv_AddTlvToObject(KamiTlv_S *pstTlv, tlv_type usType, tlv_len usLength, void *pValue)
+int Kami_Tlv_AddTlvToObject(KamiTlv_S *pstTlv, tlv_type usType, tlv_len usLength, void *pValue, int len)
 {
-    KamiTlv_S *pstItem = Kami_Tlv_CreateTlv(usType, usLength, pValue);
+    KamiTlv_S *pstItem = Kami_Tlv_CreateTlv(usType, usLength, pValue, len);
     if (!pstItem)
     {
         return -1;
@@ -230,7 +233,7 @@ void Kami_Tlv_UpdateOffset(KamiTlvPrintBuffer *buffer, KamiTlv_S *pstItem)
     switch ((pstItem->obj_type) & 0xFF)
     {
     case KamiTlv_Tlv:
-        buffer->offset += (sizeof(tlv_type) + sizeof(tlv_len) + pstItem->length);
+        buffer->offset += (pstItem->type_len + sizeof(tlv_len) + pstItem->length);
         break;
     case KamiTlv_Array:
         break;
@@ -308,19 +311,19 @@ int Kami_Tlv_PrintTlv(KamiTlv_S *input, KamiTlvPrintBuffer *const output_buffer)
         return -1;
     }
 
-    output = Kami_Tlv_Ensure(output_buffer, input->length + sizeof(tlv_type) + sizeof(tlv_len));
+    output = Kami_Tlv_Ensure(output_buffer, input->length + input->type_len + sizeof(tlv_len));
 
     if (output == NULL)
     {
         return -1;
     }
 
-    *((tlv_type *)output) = htons_type(input->type);
-    *((tlv_len *)(output + sizeof(tlv_type))) = htons_len(input->length);
+    *((tlv_type *)output) = htons_type(input->type, input->type_len);
+    *((tlv_len *)(output + input->type_len)) = htons_len(input->length);
 
-    memcpy(output + sizeof(tlv_type) + sizeof(tlv_len), input->value, input->length);
+    memcpy(output + input->type_len + sizeof(tlv_len), input->value, input->length);
 
-    output_buffer->offset += (input->length + sizeof(tlv_type) + sizeof(tlv_len));
+    output_buffer->offset += (input->length + input->type_len + sizeof(tlv_len));
 
     return 0;
 }
@@ -361,15 +364,15 @@ int Kami_Tlv_PrintArray(KamiTlv_S *item, KamiTlvPrintBuffer *const output_buffer
         return -1;
     }
 
-    output_pointer = Kami_Tlv_Ensure(output_buffer, sizeof(tlv_type) + sizeof(tlv_len));
+    output_pointer = Kami_Tlv_Ensure(output_buffer, item->type_len + sizeof(tlv_len));
     if (output_pointer == NULL)
     {
         return -1;
     }
-    *((tlv_type *)output_pointer) = htons_type(item->type);
-    *((tlv_len *)(output_pointer + sizeof(tlv_type))) = htons_len(item->length);
+    *((tlv_type *)output_pointer) = htons_type(item->type, item->type_len);
+    *((tlv_len *)(output_pointer + item->type_len)) = htons_len(item->length);
 
-    output_buffer->offset += (sizeof(tlv_type) + sizeof(tlv_len));
+    output_buffer->offset += (item->type_len + sizeof(tlv_len));
 
     while (current_item)
     {
@@ -453,13 +456,13 @@ fail:
     return NULL;
 }
 
-KamiTlv_S *Kami_Tlv_ParseObject(void *pTlvData, int iLength)
+KamiTlv_S *Kami_Tlv_ParseObject(void *pTlvData, int iLength, int len)
 {
-    if (!pTlvData || iLength < sizeof(tlv_type) + sizeof(tlv_len))
+    if (!pTlvData || iLength < len + sizeof(tlv_len))
     {
         return NULL;
     }
-    KamiTlv_S *pstRoot = Kami_Tlv_CreateObject();
+    KamiTlv_S *pstRoot = Kami_Tlv_CreateObject(len);
     if (!pstRoot)
     {
         return NULL;
@@ -468,14 +471,14 @@ KamiTlv_S *Kami_Tlv_ParseObject(void *pTlvData, int iLength)
     int iOffset = 0;
     char *pcTmp = (char *)pTlvData;
 
-    while (iLength - iOffset > (sizeof(tlv_type) + sizeof(tlv_len)))
+    while (iLength - iOffset > (len + sizeof(tlv_len)))
     {
         tlv_type *pusType = (tlv_type *)(pcTmp + iOffset);
-        iOffset += sizeof(tlv_type);
+        iOffset += len;
         tlv_len *pusLength = (tlv_len *)(pcTmp + iOffset);
         iOffset += sizeof(tlv_len);
         void *pValue = (void *)(pcTmp + iOffset);
-        if (Kami_Tlv_AddTlvToObject(pstRoot, ntohs_type(*pusType), ntohs_len(*pusLength), pValue))
+        if (Kami_Tlv_AddTlvToObject(pstRoot, ntohs_type(*pusType, len), ntohs_len(*pusLength), pValue, len))
         {
             Kami_Tlv_Delete(pstRoot);
             pstRoot = NULL;
