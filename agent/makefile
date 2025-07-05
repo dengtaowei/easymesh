@@ -1,3 +1,14 @@
-#只生成 .d,.o即可 
-BIN = mesh_agent   #这个可以保证生成nginx可执行文件
-include $(BUILD_ROOT)/common.mk
+CUR_SOURCE = ${wildcard *.c}
+
+CUR_OBJS = ${patsubst %.c, %.o, $(CUR_SOURCE)}
+
+all : $(SUB_DIR) $(CUR_OBJS)
+
+$(SUB_DIR) : ECHO
+	make -C $@
+
+$(CUR_OBJS) : %.o : %.c
+	$(CC) -c $^ -o $(OBJS_DIR)/$@ $(FLAG) 
+
+ECHO : 
+	@echo $(SUB_DIR)
