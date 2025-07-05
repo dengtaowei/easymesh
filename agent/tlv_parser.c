@@ -330,8 +330,6 @@ int Kami_Tlv_PrintTlv(KamiTlv_S *input, KamiTlvPrintBuffer *const output_buffer)
 
 int Kami_Tlv_PrintObject(KamiTlv_S *item, KamiTlvPrintBuffer *const output_buffer)
 {
-    unsigned char *output_pointer = NULL;
-    size_t length = 0;
     KamiTlv_S *current_item = item->child;
 
     if (output_buffer == NULL)
@@ -356,7 +354,6 @@ int Kami_Tlv_PrintObject(KamiTlv_S *item, KamiTlvPrintBuffer *const output_buffe
 int Kami_Tlv_PrintArray(KamiTlv_S *item, KamiTlvPrintBuffer *const output_buffer)
 {
     unsigned char *output_pointer = NULL;
-    size_t length = 0;
     KamiTlv_S *current_item = item->child;
 
     if (output_buffer == NULL)
@@ -391,7 +388,6 @@ int Kami_Tlv_PrintArray(KamiTlv_S *item, KamiTlvPrintBuffer *const output_buffer
 
 int Kami_Tlv_PrintValue(KamiTlv_S *pstItem, KamiTlvPrintBuffer *output_buffer)
 {
-    unsigned char *output = NULL;
 
     if ((pstItem == NULL) || (output_buffer == NULL))
     {

@@ -13,7 +13,8 @@ BIN = mesh_agent
 
 # LIB = 
 
-FLAG = -I$(ROOT_DIR)/include
+FLAG = 	-I$(ROOT_DIR)/include \
+		-Wall
 
 
 

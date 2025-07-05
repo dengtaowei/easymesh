@@ -328,8 +328,6 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
                     return 0;
                 }
             }
-            int i;
-            i++;
         }
         if (memcmp(interface->al_addr, msg->src_addr, ETH_ALEN) != 0)
         {

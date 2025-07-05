@@ -47,7 +47,7 @@ unsigned char *wsc_m1_msg_create(NetworkInterface *interface, int *len)
     unsigned short config_methods = htons(0x0680);
     Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_CONFIG_METHODS, sizeof(config_methods), &config_methods, 2);
 
-    unsigned char wps_state = 0x00;
+    // unsigned char wps_state = 0x00;
     Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_WPS_STATE, sizeof(conn_type_flags), &conn_type_flags, 2);
 
     unsigned char manufac[8] = {'m', 'e', 'd', 'i', 'a', 't', 'e', 'k'};
