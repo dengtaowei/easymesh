@@ -14,6 +14,7 @@ KamiList interfaces = {
 
 void send_discovery_perodic(timer_entry_t *te)
 {
+    static int count = 5;
     NetworkInterface *interface = (NetworkInterface *)te->privdata;
     int ret = send_topology_discovery(interface);
     if (ret < 0)
@@ -21,10 +22,16 @@ void send_discovery_perodic(timer_entry_t *te)
         // printf("sk send error\n");
         return;
     }
-    
-    eloop_t *loop = (eloop_t *)interface->priv_data;
-    reset_timer(&loop->timer, te);
 
+    eloop_t *loop = (eloop_t *)interface->priv_data;
+    if (!count--)
+    {
+        reset_timer(&loop->timer, te, 45000);
+    }
+    else
+    {
+        reset_timer(&loop->timer, te, 0);
+    }
     return;
 }
 
@@ -35,7 +42,7 @@ int register_interface(NetworkInterface *interface)
     KamiListAddTail(&interfaces, &interface->ifnode);
 
     eloop_t *loop = (eloop_t *)interface->priv_data;
-    interface->topo_timer = add_timer(&loop->timer, 45000, send_discovery_perodic, (void *)interface);
+    interface->topo_timer = add_timer(&loop->timer, 5000, send_discovery_perodic, (void *)interface);
     if (!interface->topo_timer)
     {
         printf("timerr error\n");

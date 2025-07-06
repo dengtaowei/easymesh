@@ -12,7 +12,7 @@ void deinit_timer(min_heap_t *min_heap);
 
 timer_entry_t *add_timer(min_heap_t *min_heap, uint32_t msec, timer_handler_pt callback, void *privdata);
 
-void reset_timer(min_heap_t *min_heap, timer_entry_t *te);
+void reset_timer(min_heap_t *min_heap, timer_entry_t *te, uint32_t msec);
 
 int del_timer(min_heap_t *min_heap, timer_entry_t *elem);
 

@@ -69,8 +69,12 @@ timer_entry_t *add_timer(min_heap_t *min_heap, uint32_t msec, timer_handler_pt c
     return te;
 }
 
-void reset_timer(min_heap_t *min_heap, timer_entry_t *te)
+void reset_timer(min_heap_t *min_heap, timer_entry_t *te, uint32_t msec)
 {
+    if (msec > 0)
+    {
+        te->interval = msec;
+    }
     te->time = current_time() + te->interval;
     pthread_mutex_lock(&min_heap->mtx);
     if (0 != min_heap_push(min_heap, te))
