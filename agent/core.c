@@ -1,12 +1,10 @@
-//
-#include <event2/buffer.h>
-#include <event2/event.h>
-#include <event2/listener.h>
-#include <event2/bufferevent.h>
+#include <stdio.h>
 #include "list.h"
 #include "ieee1905_network.h"
 #include "core.h"
 #include "cmdu.h"
+#include "eloop_event.h"
+#include "mh-timer.h"
 
 KamiList interfaces = {
     .head = NULL,
@@ -14,21 +12,19 @@ KamiList interfaces = {
     .size = 0,
 };
 
-void send_discovery_perodic(int sockfd, short what, void *arg)
+void send_discovery_perodic(timer_entry_t *te)
 {
-    NetworkInterface *interface = (NetworkInterface *)arg;
+    NetworkInterface *interface = (NetworkInterface *)te->privdata;
     int ret = send_topology_discovery(interface);
     if (ret < 0)
     {
         // printf("sk send error\n");
         return;
     }
-    struct timeval t1 = {45, 0}; // 1秒0毫秒
-    if (!evtimer_pending(interface->topo_timer, &t1))
-    {
-        evtimer_del(interface->topo_timer);
-        evtimer_add(interface->topo_timer, &t1);
-    }
+    
+    eloop_t *loop = (eloop_t *)interface->priv_data;
+    reset_timer(&loop->timer, te);
+
     return;
 }
 
@@ -38,16 +34,13 @@ int register_interface(NetworkInterface *interface)
     interface->ifnode.data = (void *)interface;
     KamiListAddTail(&interfaces, &interface->ifnode);
 
-    // 定时器，非持久事件
-    interface->topo_timer = evtimer_new((struct event_base *)interface->priv_data,
-                                        send_discovery_perodic, interface);
+    eloop_t *loop = (eloop_t *)interface->priv_data;
+    interface->topo_timer = add_timer(&loop->timer, 45000, send_discovery_perodic, (void *)interface);
     if (!interface->topo_timer)
     {
-        printf("timer error\n");
-        return 1;
+        printf("timerr error\n");
+        return -1;
     }
-    struct timeval t1 = {1, 0};              // 1秒0毫秒
-    evtimer_add(interface->topo_timer, &t1); // 插入性能 O(logn)
 
     return 0;
 }
@@ -55,7 +48,8 @@ int register_interface(NetworkInterface *interface)
 void unregister_interface(NetworkInterface *interface)
 {
     KamiListDel(&interfaces, &interface->ifnode);
-    evtimer_del(interface->topo_timer);
+    eloop_t *loop = (eloop_t *)interface->priv_data;
+    del_timer(&loop->timer, interface->topo_timer);
     return;
 }
 

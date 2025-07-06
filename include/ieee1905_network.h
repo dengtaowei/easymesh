@@ -3,6 +3,7 @@
 #include <linux/if_ether.h>
 #include <net/if.h>
 #include "list.h"
+#include "minheap.h"
 
 typedef struct _NetworkInterface NetworkInterface;
 
@@ -24,7 +25,7 @@ typedef struct _NetworkInterface
     unsigned char al_addr[ETH_ALEN];
     KamiListNode ifnode;
     KamiList nbr_1905;
-    struct event *topo_timer;
+    timer_entry_t *topo_timer;
     interface_ops *ops;
     void *priv_data;
 } NetworkInterface;

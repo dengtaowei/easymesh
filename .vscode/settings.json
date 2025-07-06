@@ -4,6 +4,8 @@
         "ieee1905_network.h": "c",
         "if.h": "c",
         "wsc.h": "c",
-        "tlv_parser.h": "c"
+        "tlv_parser.h": "c",
+        "minheap.h": "c",
+        "stdio.h": "c"
     }
 }

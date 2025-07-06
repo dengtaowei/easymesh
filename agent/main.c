@@ -2,9 +2,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <event2/event.h>
-#include <event2/listener.h>
-#include <event2/bufferevent.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -36,7 +33,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
-#include <event2/buffer.h>
+#include "eloop_event.h"
+#include <sys/epoll.h>
 
 #include <string.h>
 #ifndef _WIN32
@@ -48,67 +46,14 @@
 #include "cmdu.h"
 #include "core.h"
 
-// 错误，超时 （连接断开会进入）
-void client_event_cb(struct bufferevent *be, short events, void *arg)
-{
-    // cout << "[client_E]" << flush;
-    printf("client_E\n");
-    // 读取超时时间发生后，数据读取停止
-    if (events & BEV_EVENT_TIMEOUT && events & BEV_EVENT_READING)
-    {
-        // cout << "BEV_EVENT_READING BEV_EVENT_TIMEOUT" << endl;
-        printf("BEV_EVENT_READING BEV_EVENT_TIMEOUT\n");
-        // bufferevent_enable(be,EV_READ);
-        bufferevent_free(be);
-        return;
-    }
-    else if (events & BEV_EVENT_ERROR)
-    {
-        bufferevent_free(be);
-        return;
-    }
-    // 服务端的关闭事件
-    if (events & BEV_EVENT_EOF)
-    {
-        // cout << "BEV_EVENT_EOF" << endl;
-        printf("BEV_EVENT_EOF\n");
-        bufferevent_free(be);
-    }
-    if (events & BEV_EVENT_CONNECTED)
-    {
-        // cout << "BEV_EVENT_CONNECTED" << endl;
-        printf("BEV_EVENT_CONNECTED\n");
-        // 触发write
-        bufferevent_trigger(be, EV_WRITE, 0);
-    }
-}
-void client_write_cb(struct bufferevent *be, void *arg)
-{
-    // cout << "[client_W]" << flush;
-    printf("client_W\n");
-    FILE *fp = (FILE *)arg;
-    char data[1024] = {0};
-    int len = fread(data, 1, sizeof(data) - 1, fp);
-    if (len <= 0)
-    {
-        // 读到结尾或者文件出错
-        fclose(fp);
-        // 立刻清理，可能会造成缓冲数据没有发送结束
-        // bufferevent_free(be);
-        bufferevent_disable(be, EV_WRITE);
-        return;
-    }
-    // 写入buffer
-    // bufferevent_write(be, data, len);
-}
 
-void client_read_cb(struct bufferevent *bev, void *arg)
+void client_read_cb(io_buf_t *io)
 {
     // cout << "[client_R]" << flush;
     printf("client_R\n");
     char data[1024] = {0};
     
-    NetworkInterface *interface = (NetworkInterface *)arg;
+    NetworkInterface *interface = (NetworkInterface *)io->arg;
     int recv_b = if_recv(interface, data, sizeof(data));
     if(recv_b <= 0)
     {
@@ -127,7 +72,7 @@ int main(int argc, char *argv[])
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
         return 1;
 
-    struct event_base *base = event_base_new();
+    eloop_t *loop = eloop_create();
     // 创建网络服务器
 
     int ret = 0;
@@ -141,7 +86,7 @@ int main(int argc, char *argv[])
     interface.al_addr[4] = 0x42;
     interface.al_addr[5] = 0x57;
     
-    ret = if_create(&interface, "ens32", (void *)base);
+    ret = if_create(&interface, "ens32", (void *)loop);
     if (ret)
     {
         printf("sk create error\n");
@@ -150,19 +95,13 @@ int main(int argc, char *argv[])
 
     register_interface(&interface);
 
-    struct bufferevent *bev = bufferevent_socket_new(base, interface.fd, 0);
-    if (!bev)
-    {
-        perror("bufferevent_new");
-        return 1;
-    }
-
-    bufferevent_setcb(bev, client_read_cb, client_write_cb, client_event_cb, &interface);
-    bufferevent_enable(bev, EV_READ);
+    eloop_set_event(&loop->ios[interface.fd], interface.fd, &interface);
+    eloop_setcb_read(&loop->ios[interface.fd], client_read_cb);
+    eloop_add_event(&loop->ios[interface.fd], EPOLLIN);
 
     // 进入事件主循环
-    event_base_dispatch(base);
-    event_base_free(base);
+    eloop_run(loop);
+    eloop_destroy(loop);
     if_release(&interface);
 
     return 0;

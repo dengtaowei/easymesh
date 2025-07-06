@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "eloop_event.h"
+#include "mh-timer.h"
 
 void io_add_packer(io_buf_t *io, int nheader, int body_offset)
 {
@@ -139,6 +140,7 @@ eloop_t *eloop_create()
     {
         loop->ios[i].loop = loop;
     }
+    init_timer(&loop->timer);
     return loop;
 }
 
@@ -234,6 +236,7 @@ void eloop_destroy(eloop_t *loop)
         {
             free(loop->ios);
         }
+        deinit_timer(&loop->timer);
         free(loop);
     }
 
@@ -246,7 +249,8 @@ int eloop_run(eloop_t *loop)
     memset(events, 0, sizeof(events));
     while (1)
     {
-        int nready = epoll_wait(loop->epfd, events, MAX_EPOLL_EVENTS, -1);
+        int nearest = find_nearest_expire_timer(&loop->timer);
+        int nready = epoll_wait(loop->epfd, events, MAX_EPOLL_EVENTS, nearest);
         if (nready < 0)
         {
             continue;
@@ -266,6 +270,7 @@ int eloop_run(eloop_t *loop)
             }
             eloop_handle_data(io);
         }
+        expire_timer(&loop->timer);
     }
 }
 

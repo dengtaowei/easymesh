@@ -6,6 +6,7 @@ ECHO = echo
 SUB_DIR = 	agent/ \
 			util/ \
 			reactor/ \
+			timer/ \
 			test/
 
 ROOT_DIR = $(shell pwd)
@@ -18,13 +19,13 @@ BIN = mesh_agent test
 
 FLAG = 	-I$(ROOT_DIR)/include/ \
 		-I$(ROOT_DIR)/reactor/ \
+		-I$(ROOT_DIR)/timer/ \
 		-Wall
 
 
 
 
-LDFLAGS = 	-lpthread -O3 \
-			-levent
+LDFLAGS = 	-lpthread -O3
 
 
 
@@ -71,16 +72,22 @@ OBJS = 	$(OBJS_DIR)/cmdu.o \
 		$(OBJS_DIR)/main.o \
 		$(OBJS_DIR)/tlv_parser.o \
 		$(OBJS_DIR)/wsc.o \
+		$(OBJS_DIR)/minheap.o \
+		$(OBJS_DIR)/eloop_event.o \
+		$(OBJS_DIR)/mh-timer.o
 
 mesh_agent : $(OBJS)
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
-test : eloop_server_test eloop_client_test
+test : eloop_server_test eloop_client_test mh-timer_test
 
-eloop_server_test : $(OBJS_DIR)/eloop_server_test.o $(OBJS_DIR)/eloop_event.o
+eloop_server_test : $(OBJS_DIR)/eloop_server_test.o $(OBJS_DIR)/eloop_event.o $(OBJS_DIR)/minheap.o $(OBJS_DIR)/mh-timer.o
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
 eloop_client_test : $(OBJS_DIR)/eloop_client_test.o
+	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
+
+mh-timer_test : $(OBJS_DIR)/mh-timer_test.o $(OBJS_DIR)/minheap.o $(OBJS_DIR)/mh-timer.o
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
 

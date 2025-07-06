@@ -1,5 +1,6 @@
 #ifndef _ELOOP_EVENT_H_
 #define _ELOOP_EVENT_H_
+#include "minheap.h"
 
 typedef struct io_buf_s io_buf_t;
 typedef struct eloop_s eloop_t;
@@ -43,6 +44,7 @@ struct eloop_s
 {
     int epfd;
     io_buf_t *ios;
+    min_heap_t timer;
 };
 
 const char *io_data(io_buf_t *io);
