@@ -4,16 +4,20 @@ CC = gcc
 ECHO = echo
 
 SUB_DIR = 	agent/ \
-			util/
+			util/ \
+			reactor/ \
+			test/
+
 ROOT_DIR = $(shell pwd)
 OBJS_DIR = $(ROOT_DIR)/objs
 BIN_DIR = $(ROOT_DIR)/bin
 
-BIN = mesh_agent
+BIN = mesh_agent test
 
 # LIB = 
 
-FLAG = 	-I$(ROOT_DIR)/include \
+FLAG = 	-I$(ROOT_DIR)/include/ \
+		-I$(ROOT_DIR)/reactor/ \
 		-Wall
 
 
@@ -69,6 +73,14 @@ OBJS = 	$(OBJS_DIR)/cmdu.o \
 		$(OBJS_DIR)/wsc.o \
 
 mesh_agent : $(OBJS)
+	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
+
+test : eloop_server_test eloop_client_test
+
+eloop_server_test : $(OBJS_DIR)/eloop_server_test.o $(OBJS_DIR)/eloop_event.o
+	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
+
+eloop_client_test : $(OBJS_DIR)/eloop_client_test.o
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
 
