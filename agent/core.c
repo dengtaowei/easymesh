@@ -75,6 +75,7 @@ nbr_1905dev *search_1905_nbr(NetworkInterface *interface, const char *almac)
         nbr_1905dev *dev = container_of(tmp, nbr_1905dev, node);
         if (0 == memcmp(almac, dev->al_addr, ETH_ALEN))
         {
+            KamiListDelIterator(iter);
             return dev;
         }
     }

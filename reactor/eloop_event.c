@@ -7,14 +7,100 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <netdb.h>
 #include "eloop_event.h"
 #include "mh-timer.h"
+#include "list.h"
 
 void io_add_packer(io_buf_t *io, int nheader, int body_offset)
 {
     io->pack.nheader = nheader;
     io->pack.len_offset = body_offset;
     io->has_packer = 1;
+}
+
+int io_enqueue(io_buf_t *io, char *data, int len)
+{
+    io_write_queue_t *item = (io_write_queue_t *)malloc(sizeof(io_write_queue_t));
+    if (!item)
+    {
+        return -1;
+    }
+    memset(item, 0, sizeof(io_write_queue_t));
+    item->data = malloc(len);
+    if (!item->data)
+    {
+        free(item);
+        return -1;
+    }
+    memcpy(item->data, data, len);
+    item->len = len;
+    item->offset = 0;
+    KamiListAddTail(&io->write_queue, &item->node);
+    return len;
+}
+
+int io_write(io_buf_t *io, char *data, int len)
+{
+    int nsend = 0;
+    int flag = 1;
+    do
+    {
+        if (KamiListSize(&io->write_queue) <= 0)
+        {
+            int send_flag = 0;
+#ifdef MSG_NOSIGNAL
+            send_flag |= MSG_NOSIGNAL;
+#endif
+            nsend = send(io->fd, data, len, send_flag);
+            if (nsend < 0)
+            {
+                if (errno == EAGAIN || errno == EINTR)
+                {
+                    flag = 1;
+                    break;
+                }
+                else
+                {
+                    flag = 2;
+                    break;
+                }
+            }
+            else if (nsend == 0)
+            {
+                flag = 2;
+                break;
+            }
+            else if (nsend < len)
+            {
+                flag = 1;
+                break;
+            }
+            flag = 3;
+        }
+    } while (0);
+
+    if (flag == 1)  // enqueue
+    {
+        int enqueue_len = io_enqueue(io, data + nsend, len - nsend);
+        if (enqueue_len < 0)
+        {
+            return -1;
+        }
+        eloop_add_event(io, EPOLLOUT);
+        return nsend;
+    }
+    else if (flag == 2)  // disconnect
+    {
+        return -1;
+    }
+    else if (flag == 3)
+    {
+        return len;
+    }
+
+    return -1;
 }
 
 const char *io_data(io_buf_t *io)
@@ -25,14 +111,14 @@ const char *io_data(io_buf_t *io)
 static int __read_cb(io_buf_t *io, char *buf, int len)
 {
     int nhandle = 0;
-    while (len >= io->pack.nheader)  // 只要有包头可以读
+    while (len >= io->pack.nheader) // 只要有包头可以读
     {
         int nbody = *((int *)(buf + io->pack.len_offset));
-        if (len < nbody + io->pack.nheader)  // 不是一个完整的包
+        if (len < nbody + io->pack.nheader) // 不是一个完整的包
         {
             break;
         }
-        io->on_read(io);  // 默认已经有一个完整的包被处理
+        io->on_read(io); // 默认已经有一个完整的包被处理
 
         buf += nbody + io->pack.nheader;
         io->head += nbody + io->pack.nheader;
@@ -58,7 +144,7 @@ static void handle_read(io_buf_t *io)
     {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
-            return; 
+            return;
         }
         else
         {
@@ -69,6 +155,10 @@ static void handle_read(io_buf_t *io)
     else if (nget == 0)
     {
         printf("peer close %d\n", io->fd);
+        if (io->on_close)
+        {
+            io->on_close(io);
+        }
         eloop_reset_io(io);
         return;
     }
@@ -85,7 +175,40 @@ static void handle_read(io_buf_t *io)
         io->head = 0;
         io->tail = io->len;
     }
+}
 
+static void handle_write(io_buf_t *io)
+{
+    KamiListIterrator *iter = KamiListGetIter(&io->write_queue, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while ((tmp = KamiListNext(iter)) != NULL)
+    {
+        io_write_queue_t *queue_node = container_of(tmp, io_write_queue_t, node);
+        int should_send = queue_node->len - queue_node->offset;
+        int nsend = send(io->fd, queue_node->data + queue_node->offset, should_send, 0);
+        if (nsend <= 0)
+        {
+            KamiListDelIterator(iter);
+            return;
+        }
+        else if (nsend < should_send)
+        {
+            queue_node->offset += nsend;
+            KamiListDelIterator(iter);
+            return;
+        }
+        KamiListDel(&io->write_queue, &queue_node->node);
+        if (queue_node)
+        {
+            if (queue_node->data)
+            {
+                free(queue_node->data);
+            }
+            free(queue_node);
+        }
+    }
+    KamiListDelIterator(iter);
+    return;
 }
 
 static void eloop_handle_data(io_buf_t *io)
@@ -111,7 +234,7 @@ static void eloop_handle_data(io_buf_t *io)
 
     if (io->what & EPOLLOUT)
     {
-        io->on_write(io);
+        handle_write(io);
     }
 }
 
@@ -161,6 +284,23 @@ void eloop_reset_io(io_buf_t *io)
     {
         free(io->buf);
     }
+    KamiListIterrator *iter = KamiListGetIter(&io->write_queue, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while ((tmp = KamiListNext(iter)) != NULL)
+    {
+        KamiListDel(&io->write_queue, tmp);
+        io_write_queue_t *queue_node = container_of(tmp, io_write_queue_t, node);
+        if (queue_node)
+        {
+            if (queue_node->data)
+            {
+                free(queue_node->data);
+            }
+            free(queue_node);
+        }
+    }
+    KamiListDelIterator(iter);
+
     eloop_t *loop = io->loop;
     memset(io, 0, sizeof(io_buf_t));
     io->loop = loop;
@@ -215,6 +355,11 @@ void eloop_setcb_read(io_buf_t *io, cb_read on_read)
 void eloop_setcb_write(io_buf_t *io, cb_write on_write)
 {
     io->on_write = on_write;
+}
+
+void eloop_setcb_close(io_buf_t *io, cb_close on_close)
+{
+    io->on_close = on_close;
 }
 
 void eloop_destroy(eloop_t *loop)
@@ -308,6 +453,58 @@ int eloop_tcp_server_init(int port)
         return -1;
     }
     return fd;
+}
+
+eloop_tcp_cli_t *eloop_tcp_client_init()
+{
+    eloop_tcp_cli_t *cli = malloc(sizeof(eloop_tcp_cli_t));
+    if (!cli)
+    {
+        return NULL;
+    }
+    memset(cli, 0, sizeof(sizeof(eloop_tcp_cli_t)));
+    return cli;
+}
+
+void eloop_tcp_client_destroy(eloop_tcp_cli_t *cli)
+{
+    if (cli)
+    {
+        free(cli);
+    }
+}
+
+int eloop_tcp_connect(eloop_tcp_cli_t *cli, const char *host, const char *port)
+{
+    struct addrinfo hint, *result;
+    int res, sfd;
+
+    memset(&hint, 0, sizeof(hint));
+    hint.ai_family = AF_INET;
+    hint.ai_socktype = SOCK_STREAM;
+
+    res = getaddrinfo(host, port, &hint, &result);
+    if (res == -1)
+    {
+        perror("error : cannot get socket address!\n");
+        return -1;
+    }
+
+    sfd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (sfd == -1)
+    {
+        perror("error : cannot get socket file descriptor!\n");
+        return -1;
+    }
+
+    res = connect(sfd, result->ai_addr, result->ai_addrlen);
+    if (res == -1)
+    {
+        perror("error : cannot connect the server!\n");
+        return -1;
+    }
+
+    return sfd;
 }
 
 int eloop_addlistener(eloop_t *loop, int fd, cb_accept cb)

@@ -3,7 +3,7 @@
         {
             "type": "shell",
             "label": "build",
-            "command": "make",
+            "command": "echo",
             // "args": [
             //     ""
             // ],

@@ -6,6 +6,14 @@
         "wsc.h": "c",
         "tlv_parser.h": "c",
         "minheap.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "typeinfo": "c",
+        "group_manager.h": "c",
+        "types.h": "c",
+        "eloop_event.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "user_manager.h": "c"
     }
 }

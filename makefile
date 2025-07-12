@@ -3,29 +3,32 @@
 CC = gcc
 ECHO = echo
 
-SUB_DIR = 	agent/ \
-			util/ \
+SUB_DIR = 	util/ \
 			reactor/ \
 			timer/ \
-			test/
+			mbus/ \
+			mbus_cli/ \
+			agent/ \
+			test/ \
 
 ROOT_DIR = $(shell pwd)
 OBJS_DIR = $(ROOT_DIR)/objs
 BIN_DIR = $(ROOT_DIR)/bin
 
-BIN = mesh_agent test
+BIN = mesh_agent mbusd mbus_cli test
 
 # LIB = 
 
 FLAG = 	-I$(ROOT_DIR)/include/ \
 		-I$(ROOT_DIR)/reactor/ \
 		-I$(ROOT_DIR)/timer/ \
-		-Wall
+		-I$(ROOT_DIR)/mbus/ \
+		-Wall -g
 
 
 
 
-LDFLAGS = 	-lpthread -O3
+LDFLAGS = 	-lpthread
 
 
 
@@ -76,12 +79,42 @@ OBJS = 	$(OBJS_DIR)/cmdu.o \
 		$(OBJS_DIR)/eloop_event.o \
 		$(OBJS_DIR)/mh-timer.o
 
+MBUSD_OBJS =	$(OBJS_DIR)/mbusd.o \
+		$(OBJS_DIR)/eloop_event.o \
+		$(OBJS_DIR)/minheap.o \
+		$(OBJS_DIR)/mh-timer.o \
+		$(OBJS_DIR)/list.o \
+		$(OBJS_DIR)/group_manager.o \
+		$(OBJS_DIR)/user_manager.o \
+		$(OBJS_DIR)/bus_msg.o
+
+MBUSCLI_OBJS =	$(OBJS_DIR)/mbus_cli.o \
+		$(OBJS_DIR)/eloop_event.o \
+		$(OBJS_DIR)/minheap.o \
+		$(OBJS_DIR)/mh-timer.o \
+		$(OBJS_DIR)/list.o \
+		$(OBJS_DIR)/group_manager.o \
+		$(OBJS_DIR)/user_manager.o \
+		$(OBJS_DIR)/bus_msg.o
+
+ELOOPSERVER_OBJS = $(OBJS_DIR)/eloop_server_test.o \
+		$(OBJS_DIR)/eloop_event.o \
+		$(OBJS_DIR)/minheap.o \
+		$(OBJS_DIR)/mh-timer.o \
+		$(OBJS_DIR)/list.o
+
 mesh_agent : $(OBJS)
+	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
+
+mbusd : $(MBUSD_OBJS)
+	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
+
+mbus_cli : $(MBUSCLI_OBJS)
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
 test : eloop_server_test eloop_client_test mh-timer_test
 
-eloop_server_test : $(OBJS_DIR)/eloop_server_test.o $(OBJS_DIR)/eloop_event.o $(OBJS_DIR)/minheap.o $(OBJS_DIR)/mh-timer.o
+eloop_server_test : $(ELOOPSERVER_OBJS)
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
 eloop_client_test : $(OBJS_DIR)/eloop_client_test.o
