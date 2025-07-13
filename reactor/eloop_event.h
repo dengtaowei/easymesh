@@ -16,6 +16,7 @@ typedef void (*cb_close)(io_buf_t *io);
 
 #define IO_BUF_SIZE 8192
 #define MAX_EPOLL_EVENTS 1024
+#define MAX_WMEM_SIZE 16384
 
 struct io_pack_s
 {
@@ -51,6 +52,8 @@ struct io_buf_s
     io_pack_t pack;
     int has_packer;
     KamiList write_queue;
+    int wmem_max_size;
+    int wmem_size;
 };
 
 struct eloop_s

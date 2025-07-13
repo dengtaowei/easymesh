@@ -22,6 +22,15 @@ void io_add_packer(io_buf_t *io, int nheader, int body_offset)
 
 int io_enqueue(io_buf_t *io, char *data, int len)
 {
+    if (!data || len <= 0)
+    {
+        return -1;
+    }
+    if (io->wmem_size + len >= io->wmem_max_size)
+    {
+        printf("wmem buf is full: %d\n", io->wmem_size);
+        return -1;
+    }
     io_write_queue_t *item = (io_write_queue_t *)malloc(sizeof(io_write_queue_t));
     if (!item)
     {
@@ -38,6 +47,7 @@ int io_enqueue(io_buf_t *io, char *data, int len)
     item->len = len;
     item->offset = 0;
     KamiListAddTail(&io->write_queue, &item->node);
+    io->wmem_size += item->len;
     return len;
 }
 
@@ -198,6 +208,7 @@ static void handle_write(io_buf_t *io)
             return;
         }
         KamiListDel(&io->write_queue, &queue_node->node);
+        io->wmem_size -= queue_node->len;
         if (queue_node)
         {
             if (queue_node->data)
@@ -208,6 +219,10 @@ static void handle_write(io_buf_t *io)
         }
     }
     KamiListDelIterator(iter);
+    if (KamiListSize(&io->write_queue) <= 0)
+    {
+        eloop_del_event(io, EPOLLOUT);
+    }
     return;
 }
 
@@ -275,6 +290,7 @@ void eloop_set_event(io_buf_t *io, int fd, void *arg)
     {
         io->buf = malloc(IO_BUF_SIZE);
     }
+    io->wmem_max_size = MAX_WMEM_SIZE;
 }
 
 void eloop_reset_io(io_buf_t *io)
@@ -404,6 +420,10 @@ int eloop_run(eloop_t *loop)
         for (int idx = 0; idx < nready; idx++)
         {
             io_buf_t *io = (io_buf_t *)events[idx].data.ptr;
+            if (!io)
+            {
+                continue;
+            }
             io->what = 0;
             if (events[idx].events & EPOLLIN)
             {

@@ -102,7 +102,7 @@ void msg_timer_callback(timer_entry_t *te)
         printf("send %d\n", nsend);
     }
 
-    // reset_timer(&io->loop->timer, te, 300);
+    reset_timer(&io->loop->timer, te, 30);
     return;
 }
 
@@ -141,6 +141,22 @@ int main(int argc, char *argv[])
         printf("connect error %s\n", strerror(errno));
         return -1;
     }
+    int ret = fcntl(sockfd, F_SETFL, O_NONBLOCK | fcntl(sockfd, F_GETFL));
+    if (ret < 0)
+    {
+        printf("set non block err\n");
+        return -1;
+    }
+#define TEST_WRITE_QUEUE 1
+#if defined(TEST_WRITE_QUEUE)
+    int sndbuf = 4096;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0)
+    {
+        printf("set snd buf err\n");
+        return -1;
+    }
+
+#endif
     eloop_set_event(&loop->ios[sockfd], sockfd, NULL);
     eloop_add_event(&loop->ios[sockfd], EPOLLIN);
     io_add_packer(&loop->ios[sockfd], sizeof(msg_t), 0);
