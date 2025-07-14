@@ -16,6 +16,29 @@ typedef struct _interface_ops
     int (*get_mac_addr)(NetworkInterface *interface, unsigned char *mac);
 } interface_ops;
 
+
+enum CmduFilterOp
+{
+    IF_SEND = 0x00,
+    IF_RECV = 0x01,
+};
+
+enum CmduFilterHandle
+{
+    IF_ACCEPT = 0x00,
+    IF_DROP = 0x01,
+};
+
+typedef int (*cmdu_filter_cb)(NetworkInterface *interface, int op, void *data, int len);
+
+typedef struct cmdu_filter_s cmdu_filter_t;
+struct cmdu_filter_s
+{
+    KamiListNode node;
+    cmdu_filter_cb cb;
+};
+
+
 typedef struct _NetworkInterface
 {
     int fd;
@@ -28,11 +51,14 @@ typedef struct _NetworkInterface
     timer_entry_t *topo_timer;
     interface_ops *ops;
     void *priv_data;
+    KamiList filters;
 } NetworkInterface;
 
 int if_create(NetworkInterface *interface, const char *ifname, void *priv_data);
 void if_release(NetworkInterface *interface);
 int if_send(NetworkInterface *interface, void *buf, int size);
 int if_recv(NetworkInterface *interface, void *buf, int size);
+
+int if_register_filter(NetworkInterface *interface, cmdu_filter_cb cb);
 
 #endif

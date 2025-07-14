@@ -26,6 +26,25 @@ KamiListIterrator *KamiListGetIter(KamiList *list, int direction)
     return iter;
 }
 
+int KamiListIterInit(KamiList *list, KamiListIterrator *iter, int direction)
+{
+    if (!iter || !list)
+    {
+        return -1;
+    }
+    iter->direction = direction;
+
+    if (direction == Iter_From_Head)
+    {
+        iter->next = list->head;
+    }
+    else
+    {
+        iter->next = list->tail;
+    }
+    return 0;
+}
+
 KamiListNode *KamiListNext(KamiListIterrator *iter)
 {
     KamiListNode *cur = iter->next;

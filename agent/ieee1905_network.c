@@ -201,6 +201,16 @@ void if_release(NetworkInterface *interface)
         return;
     }
 
+    KamiListIterrator *iter = KamiListGetIter(&interface->filters, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while ((tmp = KamiListNext(iter)) != NULL)
+    {
+        cmdu_filter_t *filter = container_of(tmp, cmdu_filter_t, node);
+        KamiListDel(&interface->filters, &filter->node);
+        free(filter);
+    }
+    KamiListDelIterator(iter);
+
     interface->ops->release(interface);
 
     return;
@@ -216,13 +226,39 @@ static int linux_if_send(NetworkInterface *interface, void *buf, int size)
     return send(interface->fd, buf, size, MSG_NOSIGNAL);
 }
 
+static int if_filter_before_send(NetworkInterface *interface, void *buf, int size)
+{
+    KamiListIterrator iter;
+    KamiListIterInit(&interface->filters, &iter, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    int ret = IF_ACCEPT;
+    while ((tmp = KamiListNext(&iter)) != NULL)
+    {
+        cmdu_filter_t *filter = container_of(tmp, cmdu_filter_t, node);
+        if (filter && filter->cb)
+        {
+            ret = filter->cb(interface, IF_SEND, buf, size);
+            if (ret == IF_DROP)
+            {
+                ret = IF_DROP;
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
 int if_send(NetworkInterface *interface, void *buf, int size)
 {
     if (!interface)
     {
         return -1;
     }
-
+    int ret = if_filter_before_send(interface, buf, size);
+    if (ret == IF_DROP)
+    {
+        return -1;
+    }
     return interface->ops->send_msg(interface, buf, size);
 }
 
@@ -236,13 +272,64 @@ static int linux_if_recv(NetworkInterface *interface, void *buf, int size)
     return recv(interface->fd, buf, size, 0);
 }
 
+static int if_filter_before_recv(NetworkInterface *interface, void *buf, int size)
+{
+    KamiListIterrator iter;
+    KamiListIterInit(&interface->filters, &iter, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    int ret = IF_ACCEPT;
+    while ((tmp = KamiListNext(&iter)) != NULL)
+    {
+        cmdu_filter_t *filter = container_of(tmp, cmdu_filter_t, node);
+        if (filter && filter->cb)
+        {
+            ret = filter->cb(interface, IF_RECV, buf, size);
+            if (ret == IF_DROP)
+            {
+                ret = IF_DROP;
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
 int if_recv(NetworkInterface *interface, void *buf, int size)
 {
     if (!interface || !buf || size <= 0)
     {
         return -1;
     }
-    return interface->ops->recv_msg(interface, buf, size);
+
+    int nrecv = interface->ops->recv_msg(interface, buf, size);
+    if (nrecv > 0)
+    {
+        int op = if_filter_before_recv(interface, buf, nrecv);
+        if (op == IF_DROP)
+        {
+            return -1;
+        }
+    }
+    return nrecv;
+}
+
+int if_register_filter(NetworkInterface *interface, cmdu_filter_cb cb)
+{
+    if (!interface || !cb)
+    {
+        return -1;
+    }
+    cmdu_filter_t *filter = (cmdu_filter_t*)malloc(sizeof(cmdu_filter_t));
+    if (!filter)
+    {
+        return -1;
+    }
+    memset(filter, 0, sizeof(cmdu_filter_t));
+
+    filter->cb = cb;
+    KamiListAddTail(&interface->filters, &filter->node);
+
+    return 0;
 }
 
 static int linux_if_get_mac(NetworkInterface *interface, unsigned char *mac)

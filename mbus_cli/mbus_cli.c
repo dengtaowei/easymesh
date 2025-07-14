@@ -102,7 +102,7 @@ void msg_timer_callback(timer_entry_t *te)
         printf("send %d\n", nsend);
     }
 
-    reset_timer(&io->loop->timer, te, 30);
+    // reset_timer(&io->loop->timer, te, 30);
     return;
 }
 

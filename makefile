@@ -77,7 +77,8 @@ OBJS = 	$(OBJS_DIR)/cmdu.o \
 		$(OBJS_DIR)/wsc.o \
 		$(OBJS_DIR)/minheap.o \
 		$(OBJS_DIR)/eloop_event.o \
-		$(OBJS_DIR)/mh-timer.o
+		$(OBJS_DIR)/mh-timer.o \
+		$(OBJS_DIR)/bus_msg.o
 
 MBUSD_OBJS =	$(OBJS_DIR)/mbusd.o \
 		$(OBJS_DIR)/eloop_event.o \

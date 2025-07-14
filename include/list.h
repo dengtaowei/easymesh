@@ -40,6 +40,8 @@ typedef struct KamiListIterrator
 
 KamiListIterrator *KamiListGetIter(KamiList *list, int direction);
 
+int KamiListIterInit(KamiList *list, KamiListIterrator *iter, int direction);
+
 KamiListNode *KamiListNext(KamiListIterrator *iter);
 
 void KamiListRewind(KamiList *list, KamiListIterrator *iter);
