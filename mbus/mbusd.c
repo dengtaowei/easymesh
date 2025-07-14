@@ -27,14 +27,14 @@ static void _handle_login_request(msg_t *msg, io_buf_t *io)
 {
     printf("login request\n");
     client_t *cli = NULL;
-    char *name = msg_get_data(msg);
-    cli = user_get_by_name(name);
+    msg_login_t *login_msg = (msg_login_t *)msg_get_data(msg);
+    cli = user_get_by_name(login_msg->username);
     if (cli)
     {
         printf("user already existed\n");
         return;
     }
-    cli = user_create(name);
+    cli = user_create(login_msg->username);
     if (!cli)
     {
         printf("user create error\n");
@@ -44,16 +44,16 @@ static void _handle_login_request(msg_t *msg, io_buf_t *io)
     cli->io = io;
 }
 
-static void _handle_make_group(msg_t *msg, io_buf_t *io)
+static void _handle_create_group(msg_t *msg, io_buf_t *io)
 {
-    char *group_name = msg_get_data(msg);
-    group_t *group = search_group(group_name);
+    msg_create_group_t *c_group_msg = (msg_create_group_t *)msg_get_data(msg);
+    group_t *group = search_group(c_group_msg->groupname);
     if (group)
     {
         printf("group already existed\n");
         return;
     }
-    group = group_create(group_name);
+    group = group_create(c_group_msg->groupname);
     if (!group)
     {
         return;
@@ -70,15 +70,15 @@ static void _handle_join_group(msg_t *msg, io_buf_t *io)
         printf("user not login\n");
         return;
     }
-    char *group_name = msg_get_data(msg);
-    group_t *group = search_group(group_name);
+    msg_join_group_t *j_group_msg = (msg_join_group_t *)msg_get_data(msg);
+    group_t *group = search_group(j_group_msg->groupname);
     if (!group)
     {
         printf("group not exist\n");
         return;
     }
     
-    join_group(cli->name, group_name);
+    join_group(cli->name, j_group_msg->groupname);
     printf("user %s join group %s\n", cli->name, group->group_name);
 }
 
@@ -190,8 +190,8 @@ void handle_msg(msg_t *msg, io_buf_t *io)
     case CID_LOGIN_REQ_USERLOGIN:
         _handle_login_request(msg, io);
         break;
-    case CID_GROUP_MAKE_GROUP:
-        _handle_make_group(msg, io);
+    case CID_GROUP_CREATE_GROUP:
+        _handle_create_group(msg, io);
         break;
     case CID_GROUP_JOIN_GROUP:
         _handle_join_group(msg, io);

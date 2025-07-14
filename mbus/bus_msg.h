@@ -1,8 +1,32 @@
 #ifndef __BUS_MSG_H__
 #define __BUS_MSG_H__
 #include <stdint.h>
+#include "eloop_event.h"
 
 typedef struct group_msg_s group_msg_t;
+
+#define MAX_USERNAME_LEN 256
+#define MAX_GROUPNAME_LEN 256
+
+
+typedef struct msg_login_s msg_login_t;
+struct msg_login_s
+{
+    char username[MAX_USERNAME_LEN];
+};
+
+typedef struct msg_create_group_s msg_create_group_t;
+struct msg_create_group_s
+{
+    char groupname[MAX_GROUPNAME_LEN];
+};
+
+typedef struct msg_join_group_s msg_join_group_t;
+struct msg_join_group_s
+{
+    char groupname[MAX_GROUPNAME_LEN];
+};
+
 
 typedef struct msg_s
 {
@@ -13,12 +37,12 @@ typedef struct msg_s
     uint16_t command_id;
     uint16_t seq_num;
     uint16_t reserved;
-    uint8_t body[];
+    uint8_t body[0];
 } msg_t;
 
 struct group_msg_s
 {
-    char group_name[128];
+    char group_name[MAX_GROUPNAME_LEN];
     uint16_t group_msg_len;
     uint8_t group_msg[0];
 };
@@ -26,7 +50,7 @@ struct group_msg_s
 enum GroupCmdID
 {
     CID_GROUP_NORMAL_LIST_REQUEST = 1025,
-    CID_GROUP_MAKE_GROUP = 1026,
+    CID_GROUP_CREATE_GROUP = 1026,
     CID_GROUP_JOIN_GROUP = 1027,
     CID_GROUP_LEAVE_GROUP = 1028,
     CID_GROUP_MSG = 1029,
@@ -68,5 +92,13 @@ enum OtherCmdID
 uint16_t msg_get_command_id(msg_t *msg);
 
 char *msg_get_data(msg_t *msg);
+
+int mbus_register_object(io_buf_t *io, const char *username);
+
+int mbus_create_group(io_buf_t *io, const char *groupname);
+
+int mbus_join_group(io_buf_t *io, const char *groupname);
+
+int mbus_sendmsg_in_group(io_buf_t *io, const char *groupname, char *data, int len);
 
 #endif

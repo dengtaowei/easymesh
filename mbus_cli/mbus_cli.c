@@ -45,9 +45,9 @@ void cli_handle_read(io_buf_t *io)
     cli_handle_msg(msg, io);
 }
 
-const char *g_groupname = NULL;
-const char *g_username = NULL;
-const char *g_sendmsg = NULL;
+char *g_groupname = NULL;
+char *g_username = NULL;
+char *g_sendmsg = NULL;
 
 void msg_timer_callback(timer_entry_t *te)
 {
@@ -62,44 +62,17 @@ void msg_timer_callback(timer_entry_t *te)
         return;
     }
     io_buf_t *io = (io_buf_t *)te->privdata;
-    char buffer[2048] = {0};
-    msg_t *msg = (msg_t *)buffer;
 
     // login
-    msg->command_id = CID_LOGIN_REQ_USERLOGIN;
-    snprintf((char *)msg->body, 128, "%s", g_username);
-    msg->length = strlen(g_username) + 1;
-    int nsend = io_write(io, (char *)msg, sizeof(msg_t) + msg->length);
-    printf("send %d\n", nsend);
+    mbus_register_object(io, g_username);
 
-    // make group CID_GROUP_MAKE_GROUP
-    msg->command_id = CID_GROUP_MAKE_GROUP;
-    snprintf((char *)msg->body, 128, "%s", g_groupname);
-    msg->length = strlen(g_groupname) + 1;
-    nsend = io_write(io, (char *)msg, sizeof(msg_t) + msg->length);
-    printf("send %d\n", nsend);
+    mbus_create_group(io, g_groupname);
 
-    // join group CID_GROUP_MAKE_GROUP
-    msg->command_id = CID_GROUP_JOIN_GROUP;
-    snprintf((char *)msg->body, 128, "%s", g_groupname);
-    msg->length = strlen(g_groupname) + 1;
-    nsend = io_write(io, (char *)msg, sizeof(msg_t) + msg->length);
-    printf("send %d\n", nsend);
+    mbus_join_group(io, g_groupname);
 
     if (g_sendmsg)
     {
-        memset(buffer, 0, sizeof(buffer));
-        group_msg_t *group_msg = (group_msg_t *)msg->body;
-
-
-        // join group CID_GROUP_MAKE_GROUP
-        msg->command_id = CID_GROUP_MSG;  // send msg in group
-        snprintf((char *)group_msg->group_name, 128, "%s", g_groupname);
-        snprintf((char *)group_msg->group_msg, 128, "%s", g_sendmsg);
-        group_msg->group_msg_len = strlen(g_sendmsg) + 1;
-        msg->length = sizeof(group_msg_t) + group_msg->group_msg_len;
-        nsend = io_write(io, (char *)msg, sizeof(msg_t) + msg->length);
-        printf("send %d\n", nsend);
+        mbus_sendmsg_in_group(io, g_groupname, g_sendmsg, strlen(g_sendmsg) + 1);
     }
 
     // reset_timer(&io->loop->timer, te, 30);

@@ -54,20 +54,8 @@ const char *g_mesh_group_name = "gmesh";
 
 static void forward_cmdu(void *cmdu, int len)
 {
-    char buffer[2048] = { 0 };
-    memset(buffer, 0, sizeof(buffer));
-    msg_t *msg = (msg_t *)buffer;
-    group_msg_t *group_msg = (group_msg_t *)msg->body;
 
-
-    // join group CID_GROUP_MAKE_GROUP
-    msg->command_id = CID_GROUP_MSG;  // send msg in group
-    snprintf((char *)group_msg->group_name, 128, "%s", g_mesh_group_name);
-    memmove(group_msg->group_msg, cmdu, len);
-    group_msg->group_msg_len = len + 1;
-    msg->length = sizeof(group_msg_t) + group_msg->group_msg_len;
-    int nsend = io_write(g_mesh_io, (char *)msg, sizeof(msg_t) + msg->length);
-    printf("send %d\n", nsend);
+    mbus_sendmsg_in_group(g_mesh_io, g_mesh_group_name, cmdu, len);
 }
 
 int cmdu_filter_func(NetworkInterface *interface, int op, void *data, int len)
@@ -148,29 +136,13 @@ void mesh_obj_create_timer_cb(timer_entry_t *te)
 {
     
     io_buf_t *io = (io_buf_t *)te->privdata;
-    char buffer[2048] = {0};
-    msg_t *msg = (msg_t *)buffer;
 
     // login
-    msg->command_id = CID_LOGIN_REQ_USERLOGIN;
-    snprintf((char *)msg->body, 128, "%s", g_mesh_user_name);
-    msg->length = strlen(g_mesh_user_name) + 1;
-    int nsend = io_write(io, (char *)msg, sizeof(msg_t) + msg->length);
-    printf("send %d\n", nsend);
+    mbus_register_object(io, g_mesh_user_name);
 
-    // make group CID_GROUP_MAKE_GROUP
-    msg->command_id = CID_GROUP_MAKE_GROUP;
-    snprintf((char *)msg->body, 128, "%s", g_mesh_group_name);
-    msg->length = strlen(g_mesh_group_name) + 1;
-    nsend = io_write(io, (char *)msg, sizeof(msg_t) + msg->length);
-    printf("send %d\n", nsend);
+    mbus_create_group(io, g_mesh_group_name);
 
-    // join group CID_GROUP_MAKE_GROUP
-    msg->command_id = CID_GROUP_JOIN_GROUP;
-    snprintf((char *)msg->body, 128, "%s", g_mesh_group_name);
-    msg->length = strlen(g_mesh_group_name) + 1;
-    nsend = io_write(io, (char *)msg, sizeof(msg_t) + msg->length);
-    printf("send %d\n", nsend);
+    mbus_join_group(io, g_mesh_group_name);
 
     // reset_timer(&io->loop->timer, te, 5000);
 }
