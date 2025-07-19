@@ -116,7 +116,8 @@ CFGMGR_OBJS =	$(OBJS_DIR)/cfg_mgr.o \
 		$(OBJS_DIR)/minheap.o \
 		$(OBJS_DIR)/eloop_event.o \
 		$(OBJS_DIR)/mh-timer.o \
-		$(OBJS_DIR)/bus_msg.o
+		$(OBJS_DIR)/bus_msg.o \
+		$(OBJS_DIR)/util.o
 
 mesh_agent : $(OBJS)
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)

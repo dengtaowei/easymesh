@@ -121,7 +121,7 @@ void client_read_cb(io_buf_t *io)
 {
     // cout << "[client_R]" << flush;
     printf("client_R\n");
-    char data[1024] = {0};
+    char data[2048] = {0};
 
     NetworkInterface *interface = (NetworkInterface *)io->arg;
     int recv_b = if_recv(interface, data, sizeof(data));

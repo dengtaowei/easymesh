@@ -36,3 +36,20 @@ int get_if_mac(const char *ifname, unsigned char *mac)
     close(sockfd);
     return 0;
 }
+
+void hex_dump(char *str, unsigned char *pSrcBufVA, unsigned int SrcBufLen)
+{
+	unsigned char *pt;
+	int x;
+
+	pt = pSrcBufVA;
+	printf("%s: %p, len = %d\n",str,  pSrcBufVA, SrcBufLen);
+	for (x=0; x<SrcBufLen; x++)
+	{
+		if (x % 16 == 0)
+			printf("0x%04x : ", x);
+		printf("%02x ", ((unsigned char)pt[x]));
+		if (x%16 == 15) printf("\n");
+	}
+    printf("\n");
+}

@@ -44,7 +44,7 @@ tlv_type big2littles_type(tlv_type be, int len)
     }
     else if(len == 1)
     {
-        swapped = be;
+        swapped = (tlv_type)(*((char *)&be));
     }
     
     return swapped;
@@ -487,7 +487,7 @@ KamiTlv_S *Kami_Tlv_ParseObject(void *pTlvData, int iLength, int len)
 
 }
 
-KamiTlv_S *Kami_Tlv_GetObjectItem(KamiTlv_S *pstObject, tlv_type usType)
+KamiTlv_S *Kami_Tlv_GetObjectItem(KamiTlv_S *pstObject, tlv_type usType, int idx)
 {
     KamiTlv_S *pstNext = NULL;
     KamiTlv_S *pstChild = pstObject->child;
@@ -496,7 +496,11 @@ KamiTlv_S *Kami_Tlv_GetObjectItem(KamiTlv_S *pstObject, tlv_type usType)
         pstNext = pstChild->next;
         if (pstChild->type == usType)
         {
-            break;
+            if (!idx)
+            {
+                break;
+            }
+            idx--;
         }
         pstChild = pstNext;
     }
