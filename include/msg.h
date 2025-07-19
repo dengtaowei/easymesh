@@ -42,4 +42,24 @@ typedef struct _cmdu_raw_msg
     unsigned char tlvs[0];
 } cmdu_raw_msg;
 
+typedef struct mesh_packet_s mesh_packet_t;
+
+enum MeshPktType
+{
+    PKT_NONE = 0,
+    PKT_NETWORK = 1,
+    PKT_LOCAL = 2,
+    PKT_MAX = 3
+};
+struct mesh_packet_s
+{
+    int from;
+    int to;
+    char ifname[IF_NAMESIZE];
+    char ifaddr[ETH_ALEN];
+    char aladdr[ETH_ALEN];
+    int packet_len;
+    char packet[0];
+};
+
 #endif

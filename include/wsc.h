@@ -32,6 +32,6 @@
 #define DATA_ELEM_TYPE_VENDOR_EXTENSION 0x1049
 
 
-unsigned char * wsc_m1_msg_create(NetworkInterface *interface, int *len);
+unsigned char * wsc_m1_msg_create(char *ifaddr, int *len, unsigned char rf_bands);
 
 #endif

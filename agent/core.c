@@ -60,6 +60,22 @@ void unregister_interface(NetworkInterface *interface)
     return;
 }
 
+NetworkInterface *get_if_by_name(char *ifname)
+{
+    KamiListIterrator iter;
+    KamiListIterInit(&interfaces, &iter, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while ((tmp = KamiListNext(&iter)) != NULL)
+    {
+        NetworkInterface *interface = container_of(tmp, NetworkInterface, ifnode);
+        if (interface && 0 == strcmp(ifname, interface->ifname))
+        {
+            return interface;
+        }
+    }
+    return NULL;
+}
+
 void add_1905_nbr(NetworkInterface *interface, nbr_1905dev *nbr)
 {
     KamiListAddTail(&interface->nbr_1905, &nbr->node);

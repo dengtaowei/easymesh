@@ -10,12 +10,13 @@ SUB_DIR = 	util/ \
 			mbus_cli/ \
 			agent/ \
 			test/ \
+			cfg_mgr/
 
 ROOT_DIR = $(shell pwd)
 OBJS_DIR = $(ROOT_DIR)/objs
 BIN_DIR = $(ROOT_DIR)/bin
 
-BIN = mesh_agent mbusd mbus_cli test
+BIN = mesh_agent mbusd mbus_cli cfg_mgr test
 
 # LIB = 
 
@@ -96,13 +97,26 @@ MBUSCLI_OBJS =	$(OBJS_DIR)/mbus_cli.o \
 		$(OBJS_DIR)/list.o \
 		$(OBJS_DIR)/group_manager.o \
 		$(OBJS_DIR)/user_manager.o \
-		$(OBJS_DIR)/bus_msg.o
+		$(OBJS_DIR)/bus_msg.o \
 
 ELOOPSERVER_OBJS = $(OBJS_DIR)/eloop_server_test.o \
 		$(OBJS_DIR)/eloop_event.o \
 		$(OBJS_DIR)/minheap.o \
 		$(OBJS_DIR)/mh-timer.o \
 		$(OBJS_DIR)/list.o
+
+
+CFGMGR_OBJS =	$(OBJS_DIR)/cfg_mgr.o \
+		$(OBJS_DIR)/cmdu.o \
+		$(OBJS_DIR)/core.o \
+		$(OBJS_DIR)/ieee1905_network.o \
+		$(OBJS_DIR)/list.o \
+		$(OBJS_DIR)/tlv_parser.o \
+		$(OBJS_DIR)/wsc.o \
+		$(OBJS_DIR)/minheap.o \
+		$(OBJS_DIR)/eloop_event.o \
+		$(OBJS_DIR)/mh-timer.o \
+		$(OBJS_DIR)/bus_msg.o
 
 mesh_agent : $(OBJS)
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
@@ -111,6 +125,9 @@ mbusd : $(MBUSD_OBJS)
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
 mbus_cli : $(MBUSCLI_OBJS)
+	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
+
+cfg_mgr : $(CFGMGR_OBJS)
 	$(CC) -o $(BIN_DIR)/$@ $^ $(FLAG) $(LDFLAGS)
 
 test : eloop_server_test eloop_client_test mh-timer_test

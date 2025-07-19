@@ -52,10 +52,22 @@ io_buf_t *g_mesh_io = NULL;
 const char *g_mesh_user_name = "umesh";
 const char *g_mesh_group_name = "gmesh";
 
-static void forward_cmdu(void *cmdu, int len)
+static void forward_cmdu_to_interface(mesh_packet_t *pkt)
 {
+    NetworkInterface *interface = get_if_by_name(pkt->ifname);
+    if (interface)
+    {
+        printf("send pkt len %d to if %s\n", pkt->packet_len, pkt->ifname);
+        if_send(interface, pkt->packet, pkt->packet_len);
+    }
+}
 
-    mbus_sendmsg_in_group(g_mesh_io, g_mesh_group_name, cmdu, len);
+static void forward_cmdu(mesh_packet_t *pkt)
+{
+    if (pkt->to == PKT_NETWORK)
+    {
+        forward_cmdu_to_interface(pkt);
+    }
 }
 
 int cmdu_filter_func(NetworkInterface *interface, int op, void *data, int len)
@@ -65,12 +77,37 @@ int cmdu_filter_func(NetworkInterface *interface, int op, void *data, int len)
     case IF_SEND:
     {
         printf("filter cmdu before send\n");
-        forward_cmdu(data, len);
+        mesh_packet_t *pkt = packet_create(data, len);
+        if (!pkt)
+        {
+            printf("pkt create err\n");
+            return -1;
+        }
+        pkt->from = PKT_LOCAL;
+        pkt->to = PKT_NETWORK;
+        snprintf(pkt->ifname, sizeof(pkt->ifname), "%s", interface->ifname);
+        memcpy(pkt->ifaddr, interface->addr, ETH_ALEN);
+        memcpy(pkt->aladdr, interface->al_addr, ETH_ALEN);
+        mbus_sendmsg_in_group(g_mesh_io, g_mesh_group_name, (char *)pkt, packet_length(pkt));
+        packet_release(pkt);
         break;
     }
     case IF_RECV:
     {
         printf("filter cmdu before recv\n");
+        mesh_packet_t *pkt = packet_create(data, len);
+        if (!pkt)
+        {
+            printf("pkt create err\n");
+            return -1;
+        }
+        pkt->from = PKT_NETWORK;
+        pkt->to = PKT_LOCAL;
+        snprintf(pkt->ifname, sizeof(pkt->ifname), "%s", interface->ifname);
+        memcpy(pkt->ifaddr, interface->addr, ETH_ALEN);
+        memcpy(pkt->aladdr, interface->al_addr, ETH_ALEN);
+        mbus_sendmsg_in_group(g_mesh_io, g_mesh_group_name, (char *)pkt, packet_length(pkt));
+        packet_release(pkt);
         break;
     }
     default:
@@ -104,11 +141,20 @@ static void _mesh_handle_heartbeat(msg_t *msg, io_buf_t *io)
     printf("heart beat pong\n");
 }
 
+void mesh_handle_packet(io_buf_t *io, mesh_packet_t *pkt)
+{
+    forward_cmdu(pkt);
+}
+
 static void _mesh_handle_group_msg(msg_t *msg, io_buf_t *io)
 {
     group_msg_t *group_msg = (group_msg_t *)msg->body;
     printf("group msg from group %s, msg: %s, len: %d\n",
            group_msg->group_name, group_msg->group_msg, group_msg->group_msg_len);
+    if (0 == strcmp(group_msg->group_name, g_mesh_group_name))
+    {
+        mesh_handle_packet(io, (mesh_packet_t *)group_msg->group_msg);
+    }
 }
 
 void mesh_handle_msg(msg_t *msg, io_buf_t *io)
@@ -134,7 +180,7 @@ void mesh_handle_read(io_buf_t *io)
 
 void mesh_obj_create_timer_cb(timer_entry_t *te)
 {
-    
+
     io_buf_t *io = (io_buf_t *)te->privdata;
 
     // login

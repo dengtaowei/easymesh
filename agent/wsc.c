@@ -2,7 +2,7 @@
 #include "wsc.h"
 #include "tlv_parser.h"
 
-unsigned char *wsc_m1_msg_create(NetworkInterface *interface, int *len)
+unsigned char *wsc_m1_msg_create(char *ifaddr, int *len, unsigned char rf_bands)
 {
     KamiTlv_S *pstWsc = Kami_Tlv_CreateObject(2);
 
@@ -15,7 +15,7 @@ unsigned char *wsc_m1_msg_create(NetworkInterface *interface, int *len)
     unsigned char uuid[16] = {0};
     Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_UUID_E, sizeof(uuid), uuid, 2);
 
-    Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_MAC_ADDRESS, sizeof(interface->addr), interface->addr, 2);
+    Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_MAC_ADDRESS, ETH_ALEN, ifaddr, 2);
 
     unsigned char enrollee_nonce[16] = {0x53, 0x83, 0x78, 0x76, 0x1c, 0x9a, 0x4b, 0xee, 0x59, 0x3e, 0x6b, 0x53, 0x37, 0xd6, 0x25, 0x4b};
     Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_ENROLLEE_NONCE, sizeof(enrollee_nonce), enrollee_nonce, 2);
@@ -64,8 +64,7 @@ unsigned char *wsc_m1_msg_create(NetworkInterface *interface, int *len)
 
     Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_DEVICE_NAME, strlen("EROLEE"), (void *)"EROLEE", 2);
 
-    unsigned char band = 1;
-    Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_RF_BANDS, sizeof(band), &band, 2);
+    Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_RF_BANDS, sizeof(rf_bands), &rf_bands, 2);
 
     unsigned short assoc_state = htons(0x0001);
     Kami_Tlv_AddTlvToObject(pstWsc, DATA_ELEM_TYPE_ASSOCIATION_STATE, sizeof(assoc_state), &assoc_state, 2);

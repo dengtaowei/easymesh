@@ -212,7 +212,7 @@ int send_wsc_m1(NetworkInterface *interface, unsigned char *dest, unsigned short
     KamiTlv_S *pstRoot = Kami_Tlv_CreateObject(1);
 
     int len = 0;
-    unsigned char *pcWscVal = wsc_m1_msg_create(interface, &len);
+    unsigned char *pcWscVal = wsc_m1_msg_create((char *)interface->addr, &len, 1);
     Kami_Tlv_AddTlvToObject(pstRoot, TLV_TYPE_WSC, len, pcWscVal, 1);
 
     unsigned char sup_classes[] = {00, 00, 00, 00, 01, 00, 01, 03, 0x51, 00, 00, 0x53, 00, 00, 0x54, 00, 00};
@@ -247,25 +247,25 @@ int send_ap_capa_report(NetworkInterface *interface, unsigned char *dest, unsign
     raw_msg->msg_1905.hdr.msg_id = msg_id;
     offset += sizeof(cmdu_raw_msg);
 
-    unsigned char capa[] = {0xa1, 0x00, 0x01, 0x80, 0x85, 0x00, 0x20, 0x00, 
-        0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x08, 0x73, 
-        0x00, 0x00, 0x74, 0x00, 0x00, 0x76, 0x00, 0x00, 
-        0x77, 0x00, 0x00, 0x7d, 0x00, 0x00, 0x7e, 0x00, 
-        0x00, 0x80, 0x00, 0x00, 0x81, 0x00, 0x00, 0x85, 
-        0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 
-        0x01, 0x03, 0x51, 0x00, 0x00, 0x53, 0x00, 0x00, 
-        0x54, 0x00, 0x00, 0x86, 0x00, 0x07, 0x00, 0x00, 
-        0x00, 0x00, 0x01, 0x00, 0x5c, 0x86, 0x00, 0x07, 
-        0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x5e, 0x87, 
-        0x00, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 
-        0xff, 0xfa, 0xff, 0xfa, 0x07, 0x00, 0x87, 0x00, 
-        0x0c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0xff, 
-        0xfa, 0xff, 0xfa, 0x27, 0x40, 0x88, 0x00, 0x0d, 
-        0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04, 0xfa, 
-        0xff, 0xfa, 0xff, 0x24, 0x00, 0x88, 0x00, 0x11, 
-        0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x08, 0xfa, 
-        0xff, 0xfa, 0xff, 0xfa, 0xff, 0xfa, 0xff, 0x25, 
-        0x34, 0x00, 0x00, 0x00};
+    unsigned char capa[] = {0xa1, 0x00, 0x01, 0x80, 0x85, 0x00, 0x20, 0x00,
+                            0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x08, 0x73,
+                            0x00, 0x00, 0x74, 0x00, 0x00, 0x76, 0x00, 0x00,
+                            0x77, 0x00, 0x00, 0x7d, 0x00, 0x00, 0x7e, 0x00,
+                            0x00, 0x80, 0x00, 0x00, 0x81, 0x00, 0x00, 0x85,
+                            0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+                            0x01, 0x03, 0x51, 0x00, 0x00, 0x53, 0x00, 0x00,
+                            0x54, 0x00, 0x00, 0x86, 0x00, 0x07, 0x00, 0x00,
+                            0x00, 0x00, 0x01, 0x00, 0x5c, 0x86, 0x00, 0x07,
+                            0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x5e, 0x87,
+                            0x00, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+                            0xff, 0xfa, 0xff, 0xfa, 0x07, 0x00, 0x87, 0x00,
+                            0x0c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0xff,
+                            0xfa, 0xff, 0xfa, 0x27, 0x40, 0x88, 0x00, 0x0d,
+                            0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04, 0xfa,
+                            0xff, 0xfa, 0xff, 0x24, 0x00, 0x88, 0x00, 0x11,
+                            0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x08, 0xfa,
+                            0xff, 0xfa, 0xff, 0xfa, 0xff, 0xfa, 0xff, 0x25,
+                            0x34, 0x00, 0x00, 0x00};
 
     memcpy(buffer + offset, capa, sizeof(capa));
     offset += sizeof(capa);
@@ -316,23 +316,23 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
         printf("auto configuration renew received from %02x:%02x:%02x:%02x:%02x:%02x\n",
                msg->src_addr[0], msg->src_addr[1], msg->src_addr[2], msg->src_addr[3],
                msg->src_addr[4], msg->src_addr[5]);
-        KamiTlv_S *pstRenew = Kami_Tlv_ParseObject(msg->tlvs, size - sizeof(cmdu_raw_msg), 1);
-        if (pstRenew)
-        {
-            KamiTlv_S *pstFreqBand = Kami_Tlv_GetObjectItem(pstRenew, 0x10);
-            if (pstFreqBand)
-            {
-                printf("radio %d\n", *((char *)pstFreqBand->value));
-                if (*((char *)pstFreqBand->value) == 1)
-                {
-                    return 0;
-                }
-            }
-        }
-        if (memcmp(interface->al_addr, msg->src_addr, ETH_ALEN) != 0)
-        {
-            send_wsc_m1(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
-        }
+        // KamiTlv_S *pstRenew = Kami_Tlv_ParseObject(msg->tlvs, size - sizeof(cmdu_raw_msg), 1);
+        // if (pstRenew)
+        // {
+        //     KamiTlv_S *pstFreqBand = Kami_Tlv_GetObjectItem(pstRenew, 0x10);
+        //     if (pstFreqBand)
+        //     {
+        //         printf("radio %d\n", *((char *)pstFreqBand->value));
+        //         if (*((char *)pstFreqBand->value) == 1)
+        //         {
+        //             return 0;
+        //         }
+        //     }
+        // }
+        // if (memcmp(interface->al_addr, msg->src_addr, ETH_ALEN) != 0)
+        // {
+        //     send_wsc_m1(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
+        // }
     }
     else if (type == MSG_AP_CAPABILITY_QUERY)
     {
@@ -346,4 +346,49 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
     }
 
     return 0;
+}
+
+mesh_packet_t *packet_create(char *data, int len)
+{
+    mesh_packet_t *pkt = malloc(sizeof(mesh_packet_t) + len);
+    if (!pkt)
+    {
+        return NULL;
+    }
+    memset(pkt, 0, sizeof(mesh_packet_t) + len);
+    if (data && len > 0)
+    {
+        memcpy(pkt->packet, data, len);
+        pkt->packet_len = len;
+    }
+
+    return pkt;
+}
+void packet_release(mesh_packet_t *packet)
+{
+    if (packet)
+    {
+        free(packet);
+    }
+}
+
+int packet_length(mesh_packet_t *packet)
+{
+    return sizeof(mesh_packet_t) + packet->packet_len;
+}
+
+const char *packet_type(int type)
+{
+    static char *pkt_type_str[] = 
+    {
+        [PKT_NONE] = "PKT_NONE",
+        [PKT_NETWORK] = "PKT_NETWORK",
+        [PKT_LOCAL] = "PKT_LOCAL",
+        [PKT_MAX] = NULL,
+    };
+    if (type < PKT_NONE || type >= PKT_MAX)
+    {
+        return NULL;
+    }
+    return pkt_type_str[type];
 }
