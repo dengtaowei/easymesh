@@ -3,16 +3,24 @@
 #include <stdint.h>
 #include "eloop_event.h"
 
-typedef struct group_msg_s group_msg_t;
-
 #define MAX_USERNAME_LEN 256
 #define MAX_GROUPNAME_LEN 256
 
-
-typedef struct msg_login_s msg_login_t;
-struct msg_login_s
+enum MbusMsgCcmd
 {
-    char username[MAX_USERNAME_LEN];
+    MBUS_CMD_NONE,
+    MBUS_CMD_HEARTBEAT,
+    MBUS_CMD_PRIVATE_MSG,
+    MBUS_CMD_GROUP_MSG,
+};
+
+typedef struct mbus_s mbus_t;
+typedef void (*mbus_msg_cb)(mbus_t *mbus, int cmd, char *from, char *to, void *data, int len);
+struct mbus_s
+{
+    io_buf_t *io;
+    mbus_msg_cb msg_cb;
+    void *arg;
 };
 
 typedef struct msg_create_group_s msg_create_group_t;
@@ -27,7 +35,6 @@ struct msg_join_group_s
     char groupname[MAX_GROUPNAME_LEN];
 };
 
-
 typedef struct msg_s
 {
     uint32_t length;
@@ -40,12 +47,20 @@ typedef struct msg_s
     uint8_t body[0];
 } msg_t;
 
-struct group_msg_s
-{
-    char group_name[MAX_GROUPNAME_LEN];
-    uint16_t group_msg_len;
-    uint8_t group_msg[0];
-};
+#define MBUS_TYPE_LEN 2
+#define TYPE_GROUPMSG_SENDER_NAME 0x0001
+#define TYPE_GROUPMSG_GROUP_NAME 0x0002
+#define TYPE_GROUPMSG_GROUP_MSG 0x0003
+
+#define TYPE_PRIVATEMSG_SENDER_NAME 0x0004
+#define TYPE_PRIVATEMSG_RECEIVER_NAME 0x0005
+#define TYPE_PRIVATEMSG_PRIVATE_MSG 0x0006
+
+#define TYPE_USERLOGIN_USERNAME 0x0007
+
+#define TYPE_GROUPCREATE_GROUPNAME 0x0008
+
+#define TYPE_GROUPJOIN_GROUPNAME 0x0009
 
 enum GroupCmdID
 {
@@ -54,6 +69,11 @@ enum GroupCmdID
     CID_GROUP_JOIN_GROUP = 1027,
     CID_GROUP_LEAVE_GROUP = 1028,
     CID_GROUP_MSG = 1029,
+};
+
+enum PrivateCmdID
+{
+    CID_PRIVATE_MSG = 2000,
 };
 
 enum LoginCmdID
@@ -93,12 +113,16 @@ uint16_t msg_get_command_id(msg_t *msg);
 
 char *msg_get_data(msg_t *msg);
 
+int mbus_io_init(mbus_t *mbus, io_buf_t *io, int fd, void *arg, mbus_msg_cb msg_cb);
+
 int mbus_register_object(io_buf_t *io, const char *username);
 
 int mbus_create_group(io_buf_t *io, const char *groupname);
 
 int mbus_join_group(io_buf_t *io, const char *groupname);
 
-int mbus_sendmsg_in_group(io_buf_t *io, const char *groupname, char *data, int len);
+int mbus_sendmsg_in_group(io_buf_t *io, const char *my_name, const char *groupname, char *data, int len);
+
+int mbus_sendmsg_private(io_buf_t *io, const char *my_name, const char *peer_name, char *data, int len);
 
 #endif

@@ -47,6 +47,7 @@
 #include "core.h"
 #include "bus_msg.h"
 #include "mh-timer.h"
+#include "mesh_msg.h"
 
 io_buf_t *g_mesh_io = NULL;
 const char *g_mesh_user_name = "umesh";
@@ -88,7 +89,7 @@ int cmdu_filter_func(NetworkInterface *interface, int op, void *data, int len)
         snprintf(pkt->ifname, sizeof(pkt->ifname), "%s", interface->ifname);
         memcpy(pkt->ifaddr, interface->addr, ETH_ALEN);
         memcpy(pkt->aladdr, interface->al_addr, ETH_ALEN);
-        mbus_sendmsg_in_group(g_mesh_io, g_mesh_group_name, (char *)pkt, packet_length(pkt));
+        mbus_sendmsg_in_group(g_mesh_io, g_mesh_user_name, g_mesh_group_name, (char *)pkt, packet_length(pkt));
         packet_release(pkt);
         break;
     }
@@ -106,7 +107,7 @@ int cmdu_filter_func(NetworkInterface *interface, int op, void *data, int len)
         snprintf(pkt->ifname, sizeof(pkt->ifname), "%s", interface->ifname);
         memcpy(pkt->ifaddr, interface->addr, ETH_ALEN);
         memcpy(pkt->aladdr, interface->al_addr, ETH_ALEN);
-        mbus_sendmsg_in_group(g_mesh_io, g_mesh_group_name, (char *)pkt, packet_length(pkt));
+        mbus_sendmsg_in_group(g_mesh_io, g_mesh_user_name, g_mesh_group_name, (char *)pkt, packet_length(pkt));
         packet_release(pkt);
         break;
     }
@@ -136,46 +137,74 @@ void client_read_cb(io_buf_t *io)
     cmdu_handle(interface, data, recv_b);
 }
 
-static void _mesh_handle_heartbeat(msg_t *msg, io_buf_t *io)
+static void _mesh_handle_heartbeat(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
     printf("heart beat pong\n");
 }
 
-void mesh_handle_packet(io_buf_t *io, mesh_packet_t *pkt)
+void mesh_handle_packet(mesh_packet_t *pkt)
 {
     forward_cmdu(pkt);
 }
 
-static void _mesh_handle_group_msg(msg_t *msg, io_buf_t *io)
+static void _mesh_handle_group_msg(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
-    group_msg_t *group_msg = (group_msg_t *)msg->body;
-    printf("group msg from group %s, msg: %s, len: %d\n",
-           group_msg->group_name, group_msg->group_msg, group_msg->group_msg_len);
-    if (0 == strcmp(group_msg->group_name, g_mesh_group_name))
+    printf("group msg from %s to %s, len=%d\n", from, to, len);
+    if (0 == strcmp(to, g_mesh_group_name))
     {
-        mesh_handle_packet(io, (mesh_packet_t *)group_msg->group_msg);
+        mesh_handle_packet((mesh_packet_t *)data);
     }
 }
 
-void mesh_handle_msg(msg_t *msg, io_buf_t *io)
+static void _mesh_handle_private_msg(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
-    switch (msg_get_command_id(msg))
+    printf("private msg from %s to %s, len=%d\n", from, to, len);
+    if (0 != strcmp(to, g_mesh_user_name))
     {
-    case CID_OTHER_HEARTBEAT:
-        _mesh_handle_heartbeat(msg, io);
+
+        return;
+    }
+
+    mesh_msg_t *mesh_msg = (mesh_msg_t *)data;
+    switch (mesh_msg->mesh_msg_id)
+    {
+    case MESH_MSGCMD_CONTROLLER_INFO_REQ:
+    {
+        char buffer[128] = {0};
+        mesh_msg = (mesh_msg_t *)buffer;
+        controller_info_t *info = (controller_info_t *)mesh_msg->mesh_msg_body;
+        mesh_msg->mesh_msg_id = MESH_MSGCMD_CONTROLLER_INFO_RSP;
+        nbr_1905dev *dev_controller = find_controller(info->local_ifaddr, info->local_ifname, info->my_al_mac);
+        if (dev_controller)
+        {
+            memcpy(info->controller_al_mac, dev_controller->al_addr, ETH_ALEN);
+            mbus_sendmsg_private(mbus->io, to, from, (char *)mesh_msg, sizeof(mesh_msg_t) + sizeof(controller_info_t));
+        }
         break;
-    case CID_GROUP_MSG:
-        _mesh_handle_group_msg(msg, io);
-        break;
+    }
     default:
         break;
     }
 }
 
-void mesh_handle_read(io_buf_t *io)
+void mesh_handle_msg(mbus_t *mbus, int cmd, char *from, char *to, void *data, int len)
 {
-    msg_t *msg = (msg_t *)io_data(io);
-    mesh_handle_msg(msg, io);
+    switch (cmd)
+    {
+    case MBUS_CMD_HEARTBEAT:
+        _mesh_handle_heartbeat(mbus, from, to, data, len);
+        break;
+    case MBUS_CMD_GROUP_MSG:
+        _mesh_handle_group_msg(mbus, from, to, data, len);
+        break;
+    case MBUS_CMD_PRIVATE_MSG:
+    {
+        _mesh_handle_private_msg(mbus, from, to, data, len);
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 void mesh_obj_create_timer_cb(timer_entry_t *te)
@@ -241,10 +270,10 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    eloop_set_event(&loop->ios[sockfd], sockfd, NULL);
-    eloop_add_event(&loop->ios[sockfd], EPOLLIN);
-    io_add_packer(&loop->ios[sockfd], sizeof(msg_t), 0);
-    eloop_setcb_read(&loop->ios[sockfd], mesh_handle_read);
+    mbus_t mesh_mbus;
+    memset(&mesh_mbus, 0, sizeof(mbus_t));
+    mbus_io_init(&mesh_mbus, &loop->ios[sockfd], sockfd, NULL, mesh_handle_msg);
+
     add_timer(&loop->timer, 1, mesh_obj_create_timer_cb, &loop->ios[sockfd]);
     g_mesh_io = &loop->ios[sockfd];
     // 进入事件主循环

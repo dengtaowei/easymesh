@@ -295,6 +295,7 @@ int cmdu_handle(NetworkInterface *interface, void *buf, int size)
             {
                 memset(nbr, 0, sizeof(nbr_1905dev));
                 memcpy(nbr->al_addr, msg->src_addr, ETH_ALEN);
+                nbr->sup_service = SUP_SERVICE_CONTROLLER;
                 add_1905_nbr(interface, nbr);
                 send_topology_query(interface, msg->src_addr, msg->msg_1905.hdr.msg_id);
             }

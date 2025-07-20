@@ -79,7 +79,8 @@ OBJS = 	$(OBJS_DIR)/cmdu.o \
 		$(OBJS_DIR)/minheap.o \
 		$(OBJS_DIR)/eloop_event.o \
 		$(OBJS_DIR)/mh-timer.o \
-		$(OBJS_DIR)/bus_msg.o
+		$(OBJS_DIR)/bus_msg.o \
+		$(OBJS_DIR)/tlv_parser.o
 
 MBUSD_OBJS =	$(OBJS_DIR)/mbusd.o \
 		$(OBJS_DIR)/eloop_event.o \
@@ -88,7 +89,8 @@ MBUSD_OBJS =	$(OBJS_DIR)/mbusd.o \
 		$(OBJS_DIR)/list.o \
 		$(OBJS_DIR)/group_manager.o \
 		$(OBJS_DIR)/user_manager.o \
-		$(OBJS_DIR)/bus_msg.o
+		$(OBJS_DIR)/bus_msg.o \
+		$(OBJS_DIR)/tlv_parser.o
 
 MBUSCLI_OBJS =	$(OBJS_DIR)/mbus_cli.o \
 		$(OBJS_DIR)/eloop_event.o \
@@ -98,6 +100,7 @@ MBUSCLI_OBJS =	$(OBJS_DIR)/mbus_cli.o \
 		$(OBJS_DIR)/group_manager.o \
 		$(OBJS_DIR)/user_manager.o \
 		$(OBJS_DIR)/bus_msg.o \
+		$(OBJS_DIR)/tlv_parser.o
 
 ELOOPSERVER_OBJS = $(OBJS_DIR)/eloop_server_test.o \
 		$(OBJS_DIR)/eloop_event.o \

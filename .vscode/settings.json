@@ -16,6 +16,7 @@
         "string_view": "c",
         "user_manager.h": "c",
         "list.h": "c",
-        "bus_msg.h": "c"
+        "bus_msg.h": "c",
+        "mh-timer.h": "c"
     }
 }

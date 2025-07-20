@@ -115,3 +115,40 @@ void del_1905_nbr(NetworkInterface *interface, unsigned char *almac)
     KamiListDelIterator(iter);
     return;
 }
+
+static nbr_1905dev *find_controller_interface(NetworkInterface *interface)
+{
+    KamiListIterrator iter;
+    KamiListNode *tmp = NULL;
+    KamiListIterInit(&interface->nbr_1905, &iter, Iter_From_Head);
+    while ((tmp = KamiListNext(&iter)) != NULL)
+    {
+        nbr_1905dev *dev = container_of(tmp, nbr_1905dev, node);
+        if (dev->sup_service == SUP_SERVICE_CONTROLLER)
+        {
+            return dev;
+        }
+    }
+    return NULL;
+}
+
+nbr_1905dev *find_controller(char *local_ifaddr, char *local_ifname, char *my_almac)
+{
+    KamiListIterrator iter;
+    KamiListIterInit(&interfaces, &iter, Iter_From_Head);
+    KamiListNode *tmp = NULL;
+    while ((tmp = KamiListNext(&iter)) != NULL)
+    {
+        NetworkInterface *interface = container_of(tmp, NetworkInterface, ifnode);
+        nbr_1905dev *dev = find_controller_interface(interface);
+        if (!dev)
+        {
+            continue;
+        }
+        memcpy(local_ifaddr, interface->addr, ETH_ALEN);
+        memcpy(my_almac, interface->al_addr, ETH_ALEN);
+        strncpy(local_ifname, interface->ifname, IF_NAMESIZE - 1);
+        return dev;
+    }
+    return NULL;
+}

@@ -16,16 +16,17 @@
 #include "cmdu.h"
 #include "tlv_parser.h"
 #include "wsc.h"
+#include "mesh_msg.h"
 
 typedef struct cfg_mgr_s cfg_mgr_t;
 
 enum ConfigStatus
 {
-    UNCONFIGURED = 0,
-    BACKHAUL_READY,
-    SEND_M1,
-    WAIT_M2,
-    CONFIGURED
+    AUTOCONF_UNCONFIGURED = 0,
+    AUTOCONF_BACKHAUL_READY,
+    AUTOCONF_SEND_M1,
+    AUTOCONF_WAIT_M2,
+    AUTOCONF_CONFIGURED
 };
 
 typedef struct radio_s radio_t;
@@ -52,9 +53,11 @@ struct cfg_mgr_s
     radio_t radios[2];
     unsigned short msgid;
     int nradio;
+    timer_entry_t *autoconf_fsm_tiemr;
 };
 
-static const char *g_mesh_user_name = "cfgmgr";
+static const char *g_cfgmgr_user_name = "ucfgmgr";
+static const char *g_mesh_user_name = "umesh";
 static const char *g_mesh_group_name = "gmesh";
 
 int cfg_mgr_init(cfg_mgr_t *cfgmgr)
@@ -67,10 +70,11 @@ int cfg_mgr_init(cfg_mgr_t *cfgmgr)
     cfgmgr->m2buf.buffer = (unsigned char *)malloc(2048);
     cfgmgr->m2buf.length = 2048;
     cfgmgr->nradio = 2;
-    cfgmgr->radios[0].auto_conf_band = 0;        // 2.4 G
-    cfgmgr->radios[0].conf_state = UNCONFIGURED; // 2.4 G
-    cfgmgr->radios[1].auto_conf_band = 1;        // 5 G
-    cfgmgr->radios[1].conf_state = UNCONFIGURED; // 5 G
+    cfgmgr->msgid = 0x001a;
+    cfgmgr->radios[0].auto_conf_band = 0;                 // 2.4 G
+    cfgmgr->radios[0].conf_state = AUTOCONF_UNCONFIGURED; // 2.4 G
+    cfgmgr->radios[1].auto_conf_band = 1;                 // 5 G
+    cfgmgr->radios[1].conf_state = AUTOCONF_UNCONFIGURED; // 5 G
     return 0;
 }
 
@@ -140,7 +144,7 @@ static unsigned char *cfg_mgr_ensure_m2buf(m2buf_t *const p, size_t needed)
     return newbuffer + p->offset;
 }
 
-static void _cfgmgr_handle_heartbeat(msg_t *msg, io_buf_t *io)
+static void _cfgmgr_handle_heartbeat(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
     printf("heart beat pong\n");
 }
@@ -211,7 +215,7 @@ void cfgmgr_send_wsc_m1(cfg_mgr_t *cfgmgr, char *al_addr, char *if_addr, char *i
     snprintf(pkt->ifname, sizeof(pkt->ifname), "%s", ifname);
     memcpy(pkt->aladdr, al_addr, ETH_ALEN);
     memcpy(pkt->ifaddr, if_addr, ETH_ALEN);
-    mbus_sendmsg_in_group(cfgmgr->io, g_mesh_group_name, (char *)pkt, packet_length(pkt));
+    mbus_sendmsg_in_group(cfgmgr->io, g_cfgmgr_user_name, g_mesh_group_name, (char *)pkt, packet_length(pkt));
     packet_release(pkt);
     // return if_send(interface, raw_msg, offset);
 }
@@ -283,7 +287,9 @@ void cfgmgr_handle_autoconfiguration_response(cfg_mgr_t *cfgmgr, mesh_packet_t *
     {
         return;
     }
-    cfgmgr_send_wsc_m1(cfgmgr, pkt->aladdr, pkt->ifaddr, pkt->ifname, (char *)msg->src_addr, 0, freq_band);
+    cfgmgr->radios[freq_band].conf_state = AUTOCONF_SEND_M1;
+    reset_timer(&cfgmgr->io->loop->timer, cfgmgr->autoconf_fsm_tiemr, 10);
+    // cfgmgr_send_wsc_m1(cfgmgr, pkt->aladdr, pkt->ifaddr, pkt->ifname, (char *)msg->src_addr, 0, freq_band);
 }
 
 int cfgmgr_parse_autoconfiguration_wsc(cfg_mgr_t *cfgmgr, cmdu_raw_msg *msg, int len)
@@ -309,11 +315,13 @@ int cfgmgr_parse_autoconfiguration_wsc(cfg_mgr_t *cfgmgr, cmdu_raw_msg *msg, int
             {
                 if (*((char *)pstRfBands->value) == 0x02) // 5G
                 {
-                    cfgmgr->radios[1].conf_state = CONFIGURED;
+                    cfgmgr->radios[1].conf_state = AUTOCONF_CONFIGURED;
+                    reset_timer(&cfgmgr->io->loop->timer, cfgmgr->autoconf_fsm_tiemr, 10);
                 }
                 else if (*((char *)pstRfBands->value) == 0x01) // 2.4G
                 {
-                    cfgmgr->radios[0].conf_state = CONFIGURED;
+                    cfgmgr->radios[0].conf_state = AUTOCONF_CONFIGURED;
+                    reset_timer(&cfgmgr->io->loop->timer, cfgmgr->autoconf_fsm_tiemr, 10);
                 }
             }
             printf("received m2 wsc config %d, len=%d\n", i, pstWsc->length);
@@ -387,7 +395,7 @@ void cfgmgr_handle_packet(cfg_mgr_t *cfgmgr, mesh_packet_t *pkt)
     {
     case MSG_AP_AUTOCONFIGURATION_RENEW:
     {
-        // cfgmgr_handle_autoconfiguration_renew(cfgmgr, pkt);
+        cfgmgr_handle_autoconfiguration_renew(cfgmgr, pkt);
         break;
     }
     case MSG_AP_AUTOCONFIGURATION_WSC:
@@ -402,19 +410,6 @@ void cfgmgr_handle_packet(cfg_mgr_t *cfgmgr, mesh_packet_t *pkt)
     }
     case MSG_TOPOLOGY_DISCOBERY:
     {
-        snprintf(cfgmgr->bh_local_ifname, sizeof(cfgmgr->bh_local_ifname), "%s",
-                 pkt->ifname);
-        memcpy(cfgmgr->bh_local_ifaddr, pkt->ifaddr, ETH_ALEN);
-        memcpy(cfgmgr->bh_local_almac, pkt->aladdr, ETH_ALEN);
-        memcpy(cfgmgr->bh_almac, msg->src_addr, ETH_ALEN);
-        if (cfgmgr->radios[0].conf_state != CONFIGURED)
-        {
-            cfgmgr->radios[0].conf_state = BACKHAUL_READY;
-        }
-        if (cfgmgr->radios[1].conf_state != CONFIGURED)
-        {
-            cfgmgr->radios[1].conf_state = BACKHAUL_READY;
-        }
         break;
     }
     default:
@@ -422,42 +417,103 @@ void cfgmgr_handle_packet(cfg_mgr_t *cfgmgr, mesh_packet_t *pkt)
     }
 }
 
-static void _cfgmgr_handle_group_msg(msg_t *msg, io_buf_t *io)
+static void _cfgmgr_handle_group_msg(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
-    cfg_mgr_t *cfgmgr = (cfg_mgr_t *)io->arg;
+    cfg_mgr_t *cfgmgr = (cfg_mgr_t *)mbus->arg;
     if (!cfgmgr)
     {
         return;
     }
-    cfgmgr->io = io;
-    group_msg_t *group_msg = (group_msg_t *)msg->body;
-    printf("group msg from group %s, msg: %s, len: %d\n",
-           group_msg->group_name, group_msg->group_msg, group_msg->group_msg_len);
-    if (0 == strcmp(group_msg->group_name, g_mesh_group_name))
+    cfgmgr->io = mbus->io;
+    printf("group msg from %s to %s, len=%d\n", from, to, len);
+    if (0 == strcmp(to, g_mesh_group_name))
     {
-        cfgmgr_handle_packet(cfgmgr, (mesh_packet_t *)group_msg->group_msg);
+        cfgmgr_handle_packet(cfgmgr, (mesh_packet_t *)data);
     }
 }
 
-void cfgmgr_handle_msg(msg_t *msg, io_buf_t *io)
+static void cfgmgr_handle_priv_msg_from_mesh(mbus_t *mbus, cfg_mgr_t *cfgmgr, void *data, int len)
 {
-    switch (msg_get_command_id(msg))
+    mesh_msg_t *mesh_msg = (mesh_msg_t *)data;
+    switch (mesh_msg->mesh_msg_id)
     {
-    case CID_OTHER_HEARTBEAT:
-        _cfgmgr_handle_heartbeat(msg, io);
+    case MESH_MSGCMD_CONTROLLER_INFO_RSP:
+    {
+        controller_info_t *info = (controller_info_t *)mesh_msg->mesh_msg_body;
+        memcpy(cfgmgr->bh_almac, info->controller_al_mac, ETH_ALEN);
+        memcpy(cfgmgr->bh_local_almac, info->my_al_mac, ETH_ALEN);
+        memcpy(cfgmgr->bh_local_ifaddr, info->local_ifaddr, ETH_ALEN);
+        snprintf(cfgmgr->bh_local_ifname, sizeof(cfgmgr->bh_local_ifname), "%s", info->local_ifname);
+
+        if (cfgmgr->radios[0].conf_state != AUTOCONF_CONFIGURED)
+        {
+            cfgmgr->radios[0].conf_state = AUTOCONF_BACKHAUL_READY;
+        }
+
+        if (cfgmgr->radios[1].conf_state != AUTOCONF_CONFIGURED)
+        {
+            cfgmgr->radios[1].conf_state = AUTOCONF_BACKHAUL_READY;
+        }
+
+        reset_timer(&mbus->io->loop->timer, cfgmgr->autoconf_fsm_tiemr, 10);
         break;
-    case CID_GROUP_MSG:
-        _cfgmgr_handle_group_msg(msg, io);
-        break;
+    }
     default:
         break;
     }
 }
 
-void cfgmgr_handle_read(io_buf_t *io)
+static void cfgmgr_handle_external_command(mbus_t *mbus, cfg_mgr_t *cfgmgr, void *data, int len)
 {
-    msg_t *msg = (msg_t *)io_data(io);
-    cfgmgr_handle_msg(msg, io);
+    if (0 == strcmp(data, "reconfig"))
+    {
+        cfgmgr->radios[0].conf_state = AUTOCONF_UNCONFIGURED;
+        cfgmgr->radios[1].conf_state = AUTOCONF_UNCONFIGURED;
+        reset_timer(&mbus->io->loop->timer, cfgmgr->autoconf_fsm_tiemr, 10);
+    }
+}
+
+static void _cfgmgr_handle_private_msg(mbus_t *mbus, char *from, char *to, void *data, int len)
+{
+    cfg_mgr_t *cfgmgr = (cfg_mgr_t *)mbus->arg;
+    if (!cfgmgr)
+    {
+        return;
+    }
+    printf("private msg from %s to %s, len=%d\n", from, to, len);
+    if (0 != strcmp(to, g_cfgmgr_user_name))
+    {
+        return;
+    }
+
+    if (0 == strcmp(from, g_mesh_user_name))
+    {
+        cfgmgr_handle_priv_msg_from_mesh(mbus, cfgmgr, data, len);
+    }
+    else if (0 == strcmp(from, "ucfgmgr_config"))
+    {
+        cfgmgr_handle_external_command(mbus, cfgmgr, data, len);
+    }
+}
+
+void cfgmgr_handle_msg(mbus_t *mbus, int cmd, char *from, char *to, void *data, int len)
+{
+    switch (cmd)
+    {
+    case MBUS_CMD_HEARTBEAT:
+        _cfgmgr_handle_heartbeat(mbus, from, to, data, len);
+        break;
+    case MBUS_CMD_GROUP_MSG:
+        _cfgmgr_handle_group_msg(mbus, from, to, data, len);
+        break;
+    case MBUS_CMD_PRIVATE_MSG:
+    {
+        _cfgmgr_handle_private_msg(mbus, from, to, data, len);
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 void cfgmgr_regmsg_timer_cb(timer_entry_t *te)
@@ -465,7 +521,7 @@ void cfgmgr_regmsg_timer_cb(timer_entry_t *te)
     io_buf_t *io = (io_buf_t *)te->privdata;
 
     // login
-    mbus_register_object(io, g_mesh_user_name);
+    mbus_register_object(io, g_cfgmgr_user_name);
     mbus_create_group(io, g_mesh_group_name);
     mbus_join_group(io, g_mesh_group_name);
 
@@ -532,7 +588,7 @@ void cfgmgr_send_autoconfiguration_search(cfg_mgr_t *cfgmgr, radio_t *radio, cha
     snprintf(pkt->ifname, sizeof(pkt->ifname), "%s", ifname);
     memcpy(pkt->aladdr, al_addr, ETH_ALEN);
     memcpy(pkt->ifaddr, if_addr, ETH_ALEN);
-    mbus_sendmsg_in_group(cfgmgr->io, g_mesh_group_name, (char *)pkt, packet_length(pkt));
+    mbus_sendmsg_in_group(cfgmgr->io, g_cfgmgr_user_name, g_mesh_group_name, (char *)pkt, packet_length(pkt));
     packet_release(pkt);
 }
 
@@ -546,25 +602,54 @@ void cfgmgr_autoconf_search_timer_cb(timer_entry_t *te)
         return;
     }
 
+    int find_controller_msg_send = 0;
+
     for (int i = 0; i < sizeof(cfgmgr->radios) / sizeof(cfgmgr->radios[0]); i++)
     {
         switch (cfgmgr->radios[i].conf_state)
         {
-        case UNCONFIGURED:
+        case AUTOCONF_UNCONFIGURED:
         {
+
+            printf("need find controller\n");
+            if (find_controller_msg_send == 0)
+            {
+                mesh_msg_t mesh_msg;
+                mesh_msg.mesh_msg_id = MESH_MSGCMD_CONTROLLER_INFO_REQ;
+                mbus_sendmsg_private(cfgmgr->io, g_cfgmgr_user_name, g_mesh_user_name, (char *)&mesh_msg, sizeof(mesh_msg_t));
+                find_controller_msg_send = 1;
+            }
+
             break;
         }
-        case BACKHAUL_READY:
+        case AUTOCONF_BACKHAUL_READY:
         {
             cfgmgr_send_autoconfiguration_search(cfgmgr, &cfgmgr->radios[i], cfgmgr->bh_local_ifname, cfgmgr->bh_local_ifaddr,
                                                  cfgmgr->bh_local_almac, cfgmgr->bh_almac);
-        }
-        default:
             break;
         }
+        case AUTOCONF_SEND_M1:
+        {
+            cfgmgr_send_wsc_m1(cfgmgr, cfgmgr->bh_local_almac, cfgmgr->bh_local_ifaddr,
+                               cfgmgr->bh_local_ifname, cfgmgr->bh_almac, 0, cfgmgr->radios[i].auto_conf_band);
+            cfgmgr->radios[i].conf_state = AUTOCONF_UNCONFIGURED; // if not configured by this m1 try again
+            break;
+        }
+        case AUTOCONF_WAIT_M2:
+        {
+            break;
+        }
+        case AUTOCONF_CONFIGURED:
+        {
+            break;
+        }
+        default:
+        {
+            break;
+        }
+        }
     }
-
-    reset_timer(&cfgmgr->io->loop->timer, te, 10000);
+    reset_timer(&cfgmgr->io->loop->timer, te, 5000);
     return;
 }
 
@@ -593,13 +678,12 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    eloop_set_event(&loop->ios[sockfd], sockfd, &cfg_mgr);
-    eloop_add_event(&loop->ios[sockfd], EPOLLIN);
-    io_add_packer(&loop->ios[sockfd], sizeof(msg_t), 0);
-    eloop_setcb_read(&loop->ios[sockfd], cfgmgr_handle_read);
+    mbus_t cfgmgr_mbus;
+    memset(&cfgmgr_mbus, 0, sizeof(mbus_t));
+    mbus_io_init(&cfgmgr_mbus, &loop->ios[sockfd], sockfd, &cfg_mgr, cfgmgr_handle_msg);
     add_timer(&loop->timer, 1, cfgmgr_regmsg_timer_cb, &loop->ios[sockfd]);
     cfg_mgr.io = &loop->ios[sockfd];
-    add_timer(&loop->timer, 10000, cfgmgr_autoconf_search_timer_cb, &cfg_mgr);
+    cfg_mgr.autoconf_fsm_tiemr = add_timer(&loop->timer, 10000, cfgmgr_autoconf_search_timer_cb, &cfg_mgr);
     eloop_run(loop);
     return 0;
 }

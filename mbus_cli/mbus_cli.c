@@ -12,42 +12,44 @@
 #include "bus_msg.h"
 #include "mh-timer.h"
 
-static void _cli_handle_heartbeat(msg_t *msg, io_buf_t *io)
+static void _cli_handle_heartbeat(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
     printf("heart beat pong\n");
 }
 
-static void _cli_handle_group_msg(msg_t *msg, io_buf_t *io)
+static void _cli_handle_group_msg(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
-    group_msg_t *group_msg = (group_msg_t *)msg->body;
-    printf("group msg from group %s, msg: %s, len: %d\n", 
-        group_msg->group_name, group_msg->group_msg, group_msg->group_msg_len);
+    printf("group msg from %s to %s, len=%d\n", from, to, len);
 }
 
-void cli_handle_msg(msg_t *msg, io_buf_t *io)
+static void _cli_handle_private_msg(mbus_t *mbus, char *from, char *to, void *data, int len)
 {
-    switch (msg_get_command_id(msg))
+    printf("private msg from %s to %s, len=%d, msg: %s\n", from, to, len, (char *)data);
+}
+
+void cli_handle_msg(mbus_t *mbus, int cmd, char *from, char *to, void *data, int len)
+{
+    switch (cmd)
     {
-    case CID_OTHER_HEARTBEAT:
-        _cli_handle_heartbeat(msg, io);
+    case MBUS_CMD_HEARTBEAT:
+        _cli_handle_heartbeat(mbus, from, to, data, len);
         break;
-    case CID_GROUP_MSG:
-        _cli_handle_group_msg(msg, io);
+    case MBUS_CMD_GROUP_MSG:
+        _cli_handle_group_msg(mbus, from, to, data, len);
+        break;
+    case MBUS_CMD_PRIVATE_MSG:
+        _cli_handle_private_msg(mbus, from, to, data, len);
         break;
     default:
         break;
     }
 }
 
-void cli_handle_read(io_buf_t *io)
-{
-    msg_t *msg = (msg_t *)io_data(io);
-    cli_handle_msg(msg, io);
-}
 
 char *g_groupname = NULL;
 char *g_username = NULL;
 char *g_sendmsg = NULL;
+char *g_peername = NULL;
 
 void msg_timer_callback(timer_entry_t *te)
 {
@@ -56,23 +58,27 @@ void msg_timer_callback(timer_entry_t *te)
         printf("user name not found\n");
         return;
     }
-    if (!g_groupname)
+    if (!g_groupname && !g_peername)
     {
-        printf("group name not found\n");
+        printf("group name or peer user name not found\n");
         return;
     }
     io_buf_t *io = (io_buf_t *)te->privdata;
-
     // login
     mbus_register_object(io, g_username);
-
-    mbus_create_group(io, g_groupname);
-
-    mbus_join_group(io, g_groupname);
-
-    if (g_sendmsg)
+    if (g_groupname && g_sendmsg)
     {
-        mbus_sendmsg_in_group(io, g_groupname, g_sendmsg, strlen(g_sendmsg) + 1);
+
+        mbus_create_group(io, g_groupname);
+
+        mbus_join_group(io, g_groupname);
+
+        mbus_sendmsg_in_group(io, g_username, g_groupname, g_sendmsg, strlen(g_sendmsg) + 1);
+    }
+
+    if (g_peername && g_sendmsg)
+    {
+        mbus_sendmsg_private(io, g_username, g_peername, g_sendmsg, strlen(g_sendmsg) + 1);
     }
 
     // reset_timer(&io->loop->timer, te, 30);
@@ -82,7 +88,7 @@ void msg_timer_callback(timer_entry_t *te)
 int parse_cmdline(int argc, char *argv[])
 {
     int opt;
-    while ((opt = getopt(argc, argv, "u:g:m:")) != -1)
+    while ((opt = getopt(argc, argv, "u:g:m:p:")) != -1)
     {
         switch (opt)
         {
@@ -96,6 +102,9 @@ int parse_cmdline(int argc, char *argv[])
             break;
         case 'm':
             g_sendmsg = optarg;
+            break;
+        case 'p':
+            g_peername = optarg;
             break;
         default:
             break;
@@ -130,10 +139,11 @@ int main(int argc, char *argv[])
     }
 
 #endif
-    eloop_set_event(&loop->ios[sockfd], sockfd, NULL);
-    eloop_add_event(&loop->ios[sockfd], EPOLLIN);
-    io_add_packer(&loop->ios[sockfd], sizeof(msg_t), 0);
-    eloop_setcb_read(&loop->ios[sockfd], cli_handle_read);
+
+    mbus_t mbus_cli;
+    memset(&mbus_cli, 0, sizeof(mbus_t));
+    mbus_io_init(&mbus_cli, &loop->ios[sockfd], sockfd, NULL, cli_handle_msg);
+
     add_timer(&loop->timer, 1, msg_timer_callback, &loop->ios[sockfd]);
     eloop_run(loop);
     return 0;

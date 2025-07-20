@@ -156,7 +156,7 @@ void Kami_Tlv_Delete(KamiTlv_S *pstTlv)
         }
         if (pstTlv->value != NULL)
         {
-            printf("free %s\n", pstTlv->value);
+            // printf("free %s\n", pstTlv->value);
             free(pstTlv->value);
         }
         free(pstTlv);
